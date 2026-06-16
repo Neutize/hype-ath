@@ -261,7 +261,9 @@ export default function App() {
           </a>
           <a className="chart-link" href={CHART_URL} target="_blank" rel="noreferrer">
             <span>Show chart</span>
-            <span className="chart-arrow" aria-hidden="true" />
+            <span className="chart-arrow" aria-hidden="true">
+              ⌄⌄⌄
+            </span>
           </a>
         </div>
         {notice ? (

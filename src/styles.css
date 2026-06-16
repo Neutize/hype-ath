@@ -150,12 +150,13 @@ h1 {
 }
 
 .chart-link {
-  display: grid;
-  justify-items: center;
-  gap: 8px;
-  color: var(--ink);
-  font-size: 1rem;
-  font-weight: 760;
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 7px;
+  color: rgba(0, 36, 30, 0.42);
+  font-size: 1.08rem;
+  font-weight: 720;
   letter-spacing: 0;
   line-height: 1;
   text-decoration: none;
@@ -165,8 +166,8 @@ h1 {
 }
 
 .chart-link:hover {
-  color: #004f44;
-  transform: translateY(2px);
+  color: rgba(0, 36, 30, 0.64);
+  transform: translateY(1px);
 }
 
 .chart-link:focus-visible {
@@ -176,38 +177,16 @@ h1 {
 }
 
 .chart-arrow {
-  position: relative;
-  display: block;
-  width: 92px;
-  height: 42px;
+  display: inline-block;
+  color: rgba(0, 36, 30, 0.34);
+  font-size: 1.15em;
+  font-weight: 700;
+  line-height: 0.8;
   transition: transform 180ms ease;
 }
 
 .chart-link:hover .chart-arrow {
-  transform: translateY(3px);
-}
-
-.chart-arrow::before,
-.chart-arrow::after {
-  position: absolute;
-  top: 13px;
-  width: 60px;
-  height: 11px;
-  background: currentColor;
-  border-radius: 2px;
-  content: "";
-}
-
-.chart-arrow::before {
-  left: -1px;
-  transform: rotate(45deg);
-  transform-origin: right center;
-}
-
-.chart-arrow::after {
-  right: -1px;
-  transform: rotate(-45deg);
-  transform-origin: left center;
+  transform: translateY(2px);
 }
 
 .market-notice {
@@ -495,19 +474,7 @@ h1 {
 
   .chart-link {
     gap: 6px;
-    font-size: 0.95rem;
-  }
-
-  .chart-arrow {
-    width: 76px;
-    height: 34px;
-  }
-
-  .chart-arrow::before,
-  .chart-arrow::after {
-    top: 11px;
-    width: 50px;
-    height: 9px;
+    font-size: 1rem;
   }
 
   .market-notice {
