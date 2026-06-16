@@ -261,9 +261,9 @@ export default function App() {
           </a>
           <a className="chart-link" href={CHART_URL} target="_blank" rel="noreferrer">
             <span>Show chart</span>
-            <span className="chart-arrow" aria-hidden="true">
-              ⌄⌄⌄
-            </span>
+            <svg className="chart-arrow" viewBox="0 0 16 10" aria-hidden="true">
+              <path d="M2 2L8 8L14 2" />
+            </svg>
           </a>
         </div>
         {notice ? (

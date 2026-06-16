@@ -151,9 +151,9 @@ h1 {
 
 .chart-link {
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: center;
-  gap: 7px;
+  gap: 8px;
   color: rgba(0, 36, 30, 0.42);
   font-size: 1.08rem;
   font-weight: 720;
@@ -178,15 +178,18 @@ h1 {
 
 .chart-arrow {
   display: inline-block;
-  color: rgba(0, 36, 30, 0.34);
-  font-size: 1.15em;
-  font-weight: 700;
-  line-height: 0.8;
+  width: 18px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.4;
   transition: transform 180ms ease;
 }
 
 .chart-link:hover .chart-arrow {
-  transform: translateY(2px);
+  transform: translateY(1px);
 }
 
 .market-notice {
