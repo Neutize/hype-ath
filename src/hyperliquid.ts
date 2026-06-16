@@ -3,6 +3,7 @@ export const HYPERLIQUID_INFO_URL = "https://api.hyperliquid.xyz/info";
 export const HYPERLIQUID_WS_URL = "wss://api.hyperliquid.xyz/ws";
 
 type MidsResponse = Record<string, string>;
+const INFO_TIMEOUT_MS = 10_000;
 
 export type Candle = {
   t: number;
@@ -27,19 +28,42 @@ export type AthSnapshot = {
 };
 
 async function postInfo<TResponse>(body: unknown): Promise<TResponse> {
-  const response = await fetch(HYPERLIQUID_INFO_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
+  await applyDevDelay();
 
-  if (!response.ok) {
-    throw new Error(`Hyperliquid returned ${response.status}`);
+  const devFailure = getDevFailureMode(body);
+
+  if (devFailure) {
+    throw new Error(devFailure);
   }
 
-  return response.json() as Promise<TResponse>;
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), INFO_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(HYPERLIQUID_INFO_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+      cache: "no-store",
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Hyperliquid returned ${response.status}`);
+    }
+
+    return response.json() as Promise<TResponse>;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("Hyperliquid request timed out");
+    }
+
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
 }
 
 export async function fetchCurrentSpotPrice(): Promise<number> {
@@ -55,7 +79,7 @@ export async function fetchCurrentSpotPrice(): Promise<number> {
 }
 
 export async function fetchAthSnapshot(now = Date.now()): Promise<AthSnapshot> {
-  const candles = await postInfo<Candle[]>({
+  const rawCandles = await postInfo<Candle[]>({
     type: "candleSnapshot",
     req: {
       coin: HYPE_SPOT_COIN,
@@ -64,8 +88,9 @@ export async function fetchAthSnapshot(now = Date.now()): Promise<AthSnapshot> {
       endTime: now,
     },
   });
+  const candles = normalizeCandles(rawCandles);
 
-  if (!Array.isArray(candles) || candles.length === 0) {
+  if (candles.length === 0) {
     throw new Error("HYPE candle history is unavailable");
   }
 
@@ -108,6 +133,66 @@ export function formatUsd(value: number | undefined): string {
 
 function maxHigh(candles: Candle[]): number {
   return candles.reduce((max, candle) => Math.max(max, Number(candle.h)), Number.NEGATIVE_INFINITY);
+}
+
+function normalizeCandles(candles: Candle[]): Candle[] {
+  if (!Array.isArray(candles)) {
+    return [];
+  }
+
+  return candles.filter((candle) => Number.isFinite(Number(candle.t)) && Number.isFinite(Number(candle.h)));
+}
+
+function getDevFailureMode(body: unknown): string | undefined {
+  if (!import.meta.env.DEV || typeof window === "undefined") {
+    return undefined;
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const mode = params.get("mockMarket");
+
+  if (!mode) {
+    return undefined;
+  }
+
+  if (mode === "all") {
+    return "Simulated Hyperliquid outage";
+  }
+
+  if (mode === "price" && isInfoType(body, "allMids")) {
+    return "Simulated price outage";
+  }
+
+  if (mode === "history" && isInfoType(body, "candleSnapshot")) {
+    return "Simulated candle history outage";
+  }
+
+  return undefined;
+}
+
+function isInfoType(body: unknown, type: string): boolean {
+  return Boolean(body && typeof body === "object" && "type" in body && body.type === type);
+}
+
+async function applyDevDelay(): Promise<void> {
+  if (!import.meta.env.DEV || typeof window === "undefined") {
+    return;
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const explicitDelay = Number(params.get("mockDelay"));
+  const delayMs =
+    Number.isFinite(explicitDelay) && explicitDelay > 0
+      ? Math.min(explicitDelay, 8_000)
+      : params.get("mockMarket") === "slow"
+        ? 4_000
+        : 0;
+
+  if (delayMs <= 0) {
+    return;
+  }
+
+  await new Promise((resolve) => window.setTimeout(resolve, delayMs));
 }
 
 function getUtcDayStart(time: number): number {

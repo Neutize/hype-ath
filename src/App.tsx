@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   type AthSnapshot,
   fetchAthSnapshot,
@@ -8,11 +8,21 @@ import {
   HYPERLIQUID_WS_URL,
 } from "./hyperliquid";
 
+type RequestStatus = "loading" | "ready" | "stale" | "error";
+
 type MarketState = {
   ath?: AthSnapshot;
-  error?: string;
+  isOnline: boolean;
+  isRefreshing: boolean;
   lastUpdated?: number;
+  lastPriceAt?: number;
+  lastSnapshotAt?: number;
+  liveStatus: "connecting" | "connected" | "reconnecting";
   price?: number;
+  priceError?: string;
+  priceStatus: RequestStatus;
+  snapshotError?: string;
+  snapshotStatus: RequestStatus;
 };
 
 type AllMidsMessage = {
@@ -23,49 +33,126 @@ type AllMidsMessage = {
 };
 
 const TRADE_URL = "https://app.hyperliquid.xyz/join/NEUTIZE";
+const CHART_URL = "https://app.hyperliquid.xyz/trade/HYPE/USDC";
+const PRICE_FALLBACK_INTERVAL_MS = 12_000;
+const RECONNECT_DELAY_MS = 2_500;
+const SNAPSHOT_REFRESH_INTERVAL_MS = 60_000;
+
+const getInitialMarket = (): MarketState => ({
+  isOnline: getOnlineStatus(),
+  isRefreshing: false,
+  liveStatus: "connecting",
+  priceStatus: "loading",
+  snapshotStatus: "loading",
+});
 
 export default function App() {
-  const [market, setMarket] = useState<MarketState>({});
+  const [market, setMarket] = useState<MarketState>(getInitialMarket);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadSnapshot() {
-      try {
-        const [ath, price] = await Promise.all([fetchAthSnapshot(), fetchCurrentSpotPrice()]);
-
-        if (!cancelled) {
-          setMarket((current) => foldPriceIntoState({ ...current, ath }, price));
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setMarket((current) => ({
-            ...current,
-            error: error instanceof Error ? error.message : "Market data unavailable",
-          }));
-        }
-      }
+  const refreshMarket = useCallback(async (showLoading = false) => {
+    if (showLoading) {
+      setMarket((current) => ({
+        ...current,
+        isRefreshing: true,
+        priceStatus: current.price ? current.priceStatus : "loading",
+        snapshotStatus: current.ath ? current.snapshotStatus : "loading",
+      }));
     }
 
-    void loadSnapshot();
-    const refreshId = window.setInterval(loadSnapshot, 60_000);
+    const [athResult, priceResult] = await Promise.allSettled([
+      fetchAthSnapshot(),
+      fetchCurrentSpotPrice(),
+    ]);
+    const refreshedAt = Date.now();
+
+    setMarket((current) => {
+      const next: MarketState = {
+        ...current,
+        isRefreshing: false,
+        lastUpdated: refreshedAt,
+      };
+
+      if (athResult.status === "fulfilled") {
+        next.ath = athResult.value;
+        next.lastSnapshotAt = refreshedAt;
+        next.snapshotError = undefined;
+        next.snapshotStatus = "ready";
+      } else {
+        next.snapshotError = "ATH history is temporarily unavailable.";
+        next.snapshotStatus = current.ath ? "stale" : "error";
+      }
+
+      if (priceResult.status === "fulfilled") {
+        return foldPriceIntoState(next, priceResult.value, false, refreshedAt);
+      }
+
+      next.priceError = current.price
+        ? "Showing the last price while live data reconnects."
+        : "Live price is temporarily unavailable.";
+      next.priceStatus = current.price ? "stale" : "error";
+
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    void refreshMarket(true);
+    const refreshId = window.setInterval(() => void refreshMarket(false), SNAPSHOT_REFRESH_INTERVAL_MS);
+
+    return () => window.clearInterval(refreshId);
+  }, [refreshMarket]);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setMarket((current) => ({ ...current, isOnline: true }));
+      void refreshMarket(true);
+    };
+
+    const handleOffline = () => {
+      setMarket((current) => ({
+        ...current,
+        isOnline: false,
+        liveStatus: "reconnecting",
+        priceStatus: current.price ? "stale" : "error",
+        snapshotStatus: current.ath ? "stale" : "error",
+      }));
+    };
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
 
     return () => {
-      cancelled = true;
-      window.clearInterval(refreshId);
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
     };
-  }, []);
+  }, [refreshMarket]);
 
   useEffect(() => {
     let closedByApp = false;
     let reconnectId: number | undefined;
     let socket: WebSocket | undefined;
 
+    if (shouldMockLiveFeed()) {
+      setMarket((current) => ({
+        ...current,
+        liveStatus: "reconnecting",
+      }));
+
+      return () => {
+        closedByApp = true;
+      };
+    }
+
     const applyPrice = (price: number) => {
-      setMarket((current) => foldPriceIntoState(current, price));
+      setMarket((current) => foldPriceIntoState(current, price, true));
     };
 
     const connect = () => {
+      setMarket((current) => ({
+        ...current,
+        liveStatus: current.price ? "reconnecting" : "connecting",
+      }));
+
       socket = new WebSocket(HYPERLIQUID_WS_URL);
 
       socket.addEventListener("open", () => {
@@ -86,9 +173,22 @@ export default function App() {
         }
       });
 
+      socket.addEventListener("error", () => {
+        setMarket((current) => ({
+          ...current,
+          liveStatus: "reconnecting",
+          priceStatus: current.price ? "stale" : current.priceStatus,
+        }));
+      });
+
       socket.addEventListener("close", () => {
         if (!closedByApp) {
-          reconnectId = window.setTimeout(connect, 2500);
+          setMarket((current) => ({
+            ...current,
+            liveStatus: "reconnecting",
+            priceStatus: current.price ? "stale" : current.priceStatus,
+          }));
+          reconnectId = window.setTimeout(connect, RECONNECT_DELAY_MS);
         }
       });
     };
@@ -101,10 +201,13 @@ export default function App() {
       } catch {
         setMarket((current) => ({
           ...current,
-          error: current.price ? undefined : "Live price unavailable",
+          priceError: current.price
+            ? "Showing the last price while live data reconnects."
+            : "Live price is temporarily unavailable.",
+          priceStatus: current.price ? "stale" : "error",
         }));
       }
-    }, 12_000);
+    }, PRICE_FALLBACK_INTERVAL_MS);
 
     return () => {
       closedByApp = true;
@@ -117,9 +220,20 @@ export default function App() {
   }, []);
 
   const answer = market.ath?.hitNewAthToday;
+  const isAnswerLoading = answer === undefined && market.snapshotStatus === "loading";
+  const isPriceLoading = market.price === undefined && market.priceStatus === "loading";
   const answerText = answer === undefined ? "..." : answer ? "Yes." : "No";
-  const answerClass = answer === false ? "answer no" : "answer yes";
+  const answerClass = [
+    "answer",
+    answer === false ? "no" : answer === true ? "yes" : "pending",
+    isAnswerLoading ? "is-loading" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const priceClass = ["price", market.price === undefined ? "price-pending" : ""].filter(Boolean).join(" ");
   const priceText = useMemo(() => formatUsd(market.price), [market.price]);
+  const notice = getMarketNotice(market);
+  const isBusy = isAnswerLoading || isPriceLoading || market.isRefreshing;
   const statusText = getMarketStatus(market);
 
   return (
@@ -132,13 +246,35 @@ export default function App() {
         <div className="price-line price-line-b" />
       </div>
 
-      <section className="content-stack" aria-live="polite">
+      <section className="content-stack" aria-busy={isBusy} aria-live="polite">
         <h1>Did $HYPE hit a new ATH today?</h1>
-        <p className={answerClass}>{answerText}</p>
-        <p className="price">Current price: {priceText}</p>
-        <a className="trade-button" href={TRADE_URL} target="_blank" rel="noreferrer">
-          Trade
-        </a>
+        <p className={answerClass} aria-label={isAnswerLoading ? "ATH check loading" : answerText}>
+          {isAnswerLoading ? <span className="shimmer answer-shimmer" aria-hidden="true" /> : answerText}
+        </p>
+        <p className={priceClass}>
+          Current price:{" "}
+          {isPriceLoading ? <span className="shimmer price-shimmer" aria-hidden="true" /> : priceText}
+        </p>
+        <div className="actions-stack">
+          <a className="trade-button" href={TRADE_URL} target="_blank" rel="noreferrer">
+            Trade
+          </a>
+          <a className="chart-link" href={CHART_URL} target="_blank" rel="noreferrer">
+            <span>Show chart</span>
+            <span className="chart-arrow" aria-hidden="true" />
+          </a>
+        </div>
+        {notice ? (
+          <div className="market-notice" role="status">
+            <div>
+              <strong>{notice.title}</strong>
+              <span>{notice.body}</span>
+            </div>
+            <button type="button" onClick={() => void refreshMarket(true)} disabled={market.isRefreshing}>
+              {market.isRefreshing ? "Checking" : "Retry"}
+            </button>
+          </div>
+        ) : null}
       </section>
 
       <p className="visually-hidden">{statusText}</p>
@@ -146,7 +282,7 @@ export default function App() {
   );
 }
 
-function foldPriceIntoState(state: MarketState, price: number): MarketState {
+function foldPriceIntoState(state: MarketState, price: number, isRealtime: boolean, now = Date.now()): MarketState {
   const ath = state.ath ? { ...state.ath } : undefined;
 
   if (ath) {
@@ -158,9 +294,12 @@ function foldPriceIntoState(state: MarketState, price: number): MarketState {
   return {
     ...state,
     ath,
-    error: undefined,
-    lastUpdated: Date.now(),
+    lastPriceAt: now,
+    lastUpdated: now,
+    liveStatus: isRealtime ? "connected" : state.liveStatus,
     price,
+    priceError: undefined,
+    priceStatus: "ready",
   };
 }
 
@@ -177,8 +316,10 @@ function safeParseMessage(data: string | ArrayBufferLike | Blob | ArrayBufferVie
 }
 
 function getMarketStatus(market: MarketState): string {
-  if (market.error) {
-    return market.error;
+  const notice = getMarketNotice(market);
+
+  if (notice) {
+    return `${notice.title}. ${notice.body}`;
   }
 
   if (!market.lastUpdated) {
@@ -190,4 +331,59 @@ function getMarketStatus(market: MarketState): string {
     minute: "2-digit",
     second: "2-digit",
   })}.`;
+}
+
+function getMarketNotice(market: MarketState): { body: string; title: string } | undefined {
+  if (!market.isOnline) {
+    return {
+      title: "Offline mode",
+      body: market.price
+        ? "Showing the last price we received. Reconnect to refresh the ATH check."
+        : "Connect to the internet to load HYPE market data.",
+    };
+  }
+
+  if (market.snapshotStatus === "error" && market.priceStatus === "error") {
+    return {
+      title: "Market data is unavailable",
+      body: "Hyperliquid is not responding right now. Try again in a moment.",
+    };
+  }
+
+  if (market.snapshotStatus === "error") {
+    return {
+      title: "ATH check is unavailable",
+      body: "Live price can still update, but the ATH answer needs candle history.",
+    };
+  }
+
+  if (market.priceStatus === "error") {
+    return {
+      title: "Live price is unavailable",
+      body: "The ATH check may still load, but the current price is not responding.",
+    };
+  }
+
+  if (market.snapshotStatus === "stale" || market.priceStatus === "stale") {
+    return {
+      title: "Refreshing market data",
+      body: "Showing the latest value we have while Hyperliquid reconnects.",
+    };
+  }
+
+  return undefined;
+}
+
+function getOnlineStatus(): boolean {
+  return typeof navigator === "undefined" ? true : navigator.onLine;
+}
+
+function shouldMockLiveFeed(): boolean {
+  if (!import.meta.env.DEV || typeof window === "undefined") {
+    return false;
+  }
+
+  const mock = new URLSearchParams(window.location.search).get("mockMarket");
+
+  return mock === "all" || mock === "price" || mock === "slow";
 }
