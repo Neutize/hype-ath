@@ -120,6 +120,7 @@ export default function App() {
   const answerText = answer === undefined ? "..." : answer ? "Yes." : "No";
   const answerClass = answer === false ? "answer no" : "answer yes";
   const priceText = useMemo(() => formatUsd(market.price), [market.price]);
+  const statusText = getMarketStatus(market);
 
   return (
     <main className="page-shell">
@@ -140,9 +141,7 @@ export default function App() {
         </a>
       </section>
 
-      <p className="visually-hidden">
-        {market.error ? market.error : `Last updated ${market.lastUpdated ?? "pending"}`}
-      </p>
+      <p className="visually-hidden">{statusText}</p>
     </main>
   );
 }
@@ -175,4 +174,20 @@ function safeParseMessage(data: string | ArrayBufferLike | Blob | ArrayBufferVie
   } catch {
     return null;
   }
+}
+
+function getMarketStatus(market: MarketState): string {
+  if (market.error) {
+    return market.error;
+  }
+
+  if (!market.lastUpdated) {
+    return "Market data pending.";
+  }
+
+  return `Market data updated at ${new Date(market.lastUpdated).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+  })}.`;
 }
