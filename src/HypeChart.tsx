@@ -248,7 +248,6 @@ export function HypeChart({ latestPrice, visible }: HypeChartProps) {
       <div className="chart-toolbar">
         <div className="chart-heading">
           <span className="chart-title">$HYPE Spot</span>
-          <span className="chart-subtitle">{getIntervalLabel(selectedInterval)} candles</span>
         </div>
         <div className="chart-timeframes" role="group" aria-label="Chart timeframe">
           {CHART_INTERVALS.map((interval) => (
@@ -314,8 +313,4 @@ function applyInitialVisibleRange(chart: IChartApi, dataLength: number, interval
   const to = lastBarIndex + RIGHT_OFFSET_BARS;
 
   chart.timeScale().setVisibleLogicalRange({ from, to });
-}
-
-function getIntervalLabel(interval: ChartInterval): string {
-  return CHART_INTERVALS.find((item) => item.value === interval)?.label ?? interval;
 }

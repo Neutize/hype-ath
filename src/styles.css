@@ -79,7 +79,7 @@ a {
   min-height: calc(100dvh - var(--page-padding-block) - var(--page-padding-block));
   align-content: center;
   justify-items: center;
-  gap: 24px;
+  gap: clamp(28px, 3.6vw, 42px);
   text-align: center;
 }
 
@@ -198,13 +198,13 @@ h1 {
 .price-stack {
   display: grid;
   justify-items: center;
-  gap: 9px;
+  gap: 11px;
 }
 
 .actions-stack {
   display: grid;
   justify-items: center;
-  gap: 16px;
+  gap: 18px;
 }
 
 .trade-button {
@@ -342,13 +342,13 @@ h1 {
 .chart-panel {
   display: grid;
   width: min(100%, 880px);
-  gap: 12px;
-  margin-top: 4px;
+  gap: 16px;
+  margin-top: 10px;
   border: 1px solid rgba(0, 213, 193, 0.24);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.34);
   box-shadow: 0 24px 80px rgba(0, 36, 30, 0.08);
-  padding: 16px;
+  padding: 18px;
 }
 
 .chart-toolbar,
@@ -378,7 +378,6 @@ h1 {
   line-height: 1;
 }
 
-.chart-subtitle,
 .chart-footer {
   color: rgba(0, 36, 30, 0.48);
   font-size: 0.78rem;
