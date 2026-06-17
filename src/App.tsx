@@ -51,6 +51,7 @@ const getInitialMarket = (): MarketState => ({
 export default function App() {
   const [market, setMarket] = useState<MarketState>(getInitialMarket);
   const [isChartOpen, setIsChartOpen] = useState(false);
+  const pendingChartScrollRef = useRef<(() => void) | undefined>(undefined);
   const scrollCleanupRef = useRef<(() => void) | undefined>(undefined);
 
   const refreshMarket = useCallback(async (showLoading = false) => {
@@ -223,40 +224,9 @@ export default function App() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!isChartOpen) {
-      return;
-    }
-
-    const scrollId = window.setTimeout(() => {
-      const chartPanel = document.getElementById("hype-chart-panel");
-      const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-      if (!chartPanel) {
-        return;
-      }
-
-      const startScroll = window.scrollY;
-      const targetScroll = getChartScrollTarget(chartPanel);
-
-      if (prefersReducedMotion) {
-        window.scrollTo(0, targetScroll);
-        return;
-      }
-
-      scrollCleanupRef.current?.();
-      scrollCleanupRef.current = animateWindowScroll(startScroll, targetScroll, CHART_SCROLL_DURATION_MS, () => {
-        scrollCleanupRef.current = undefined;
-      });
-    }, CHART_SCROLL_DELAY_MS);
-
-    return () => {
-      window.clearTimeout(scrollId);
-    };
-  }, [isChartOpen]);
-
   useEffect(
     () => () => {
+      pendingChartScrollRef.current?.();
       scrollCleanupRef.current?.();
     },
     [],
@@ -279,21 +249,23 @@ export default function App() {
   const isBusy = isAnswerLoading || isPriceLoading || market.isRefreshing;
   const statusText = getMarketStatus(market);
   const toggleChart = useCallback(() => {
+    pendingChartScrollRef.current?.();
     scrollCleanupRef.current?.();
 
     if (!isChartOpen) {
       setIsChartOpen(true);
+      pendingChartScrollRef.current = scheduleChartScroll(scrollCleanupRef);
       return;
     }
 
     const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    if (prefersReducedMotion || window.scrollY < 2) {
+    if (prefersReducedMotion || getPageScroll() < 2) {
       setIsChartOpen(false);
       return;
     }
 
-    scrollCleanupRef.current = animateWindowScroll(window.scrollY, 0, CHART_SCROLL_DURATION_MS, () => {
+    scrollCleanupRef.current = animateWindowScroll(getPageScroll(), 0, CHART_SCROLL_DURATION_MS, () => {
       scrollCleanupRef.current = undefined;
       setIsChartOpen(false);
     });
@@ -457,9 +429,48 @@ function getChartScrollTarget(chartPanel: HTMLElement): number {
   const panelRect = chartPanel.getBoundingClientRect();
   const documentHeight = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
   const maxScroll = Math.max(0, documentHeight - window.innerHeight);
-  const centeredScroll = window.scrollY + panelRect.top - Math.max(24, (window.innerHeight - panelRect.height) / 2);
+  const centeredScroll = getPageScroll() + panelRect.top - Math.max(24, (window.innerHeight - panelRect.height) / 2);
 
   return Math.min(Math.max(centeredScroll, 0), maxScroll);
+}
+
+function scheduleChartScroll(scrollCleanupRef: { current: (() => void) | undefined }): () => void {
+  let frameId: number | undefined;
+  const timeoutId = window.setTimeout(() => {
+    const startChartScroll = (attempt = 0) => {
+      const chartPanel = document.getElementById("hype-chart-panel");
+      const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      if (!chartPanel || chartPanel.getBoundingClientRect().height === 0) {
+        if (attempt < 12) {
+          frameId = window.requestAnimationFrame(() => startChartScroll(attempt + 1));
+        }
+        return;
+      }
+
+      const startScroll = getPageScroll();
+      const targetScroll = getChartScrollTarget(chartPanel);
+
+      if (prefersReducedMotion) {
+        setPageScroll(targetScroll);
+        return;
+      }
+
+      scrollCleanupRef.current?.();
+      scrollCleanupRef.current = animateWindowScroll(startScroll, targetScroll, CHART_SCROLL_DURATION_MS, () => {
+        scrollCleanupRef.current = undefined;
+      });
+    };
+
+    startChartScroll();
+  }, CHART_SCROLL_DELAY_MS);
+
+  return () => {
+    window.clearTimeout(timeoutId);
+    if (frameId) {
+      window.cancelAnimationFrame(frameId);
+    }
+  };
 }
 
 function animateWindowScroll(
@@ -473,7 +484,7 @@ function animateWindowScroll(
   let isCancelled = false;
 
   if (Math.abs(distance) < 1) {
-    window.scrollTo(0, targetScroll);
+    setPageScroll(targetScroll);
     onComplete?.();
     return () => undefined;
   }
@@ -488,7 +499,7 @@ function animateWindowScroll(
     const progress = Math.min((now - startTime) / duration, 1);
     const nextScroll = startScroll + distance * easeInOutCubic(progress);
 
-    window.scrollTo(0, nextScroll);
+    setPageScroll(nextScroll);
 
     if (progress < 1) {
       animationId = window.requestAnimationFrame(animateScroll);
@@ -507,6 +518,16 @@ function animateWindowScroll(
       window.cancelAnimationFrame(animationId);
     }
   };
+}
+
+function getPageScroll(): number {
+  return window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+}
+
+function setPageScroll(nextScroll: number): void {
+  window.scrollTo(0, nextScroll);
+  document.documentElement.scrollTop = nextScroll;
+  document.body.scrollTop = nextScroll;
 }
 
 function easeInOutCubic(progress: number): number {

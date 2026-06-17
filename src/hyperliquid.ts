@@ -4,7 +4,12 @@ export const HYPERLIQUID_WS_URL = "wss://api.hyperliquid.xyz/ws";
 
 type MidsResponse = Record<string, string>;
 const INFO_TIMEOUT_MS = 10_000;
-const CHART_LOOKBACK_MS = 1000 * 60 * 60 * 24 * 120;
+const DAY_MS = 1000 * 60 * 60 * 24;
+const CHART_LOOKBACK_MS_BY_INTERVAL: Record<ChartInterval, number> = {
+  "1m": DAY_MS,
+  "15m": DAY_MS * 14,
+  "4h": DAY_MS * 120,
+};
 
 export type Candle = {
   t: number;
@@ -35,6 +40,8 @@ export type ChartCandle = {
   open: number;
   time: number;
 };
+
+export type ChartInterval = "1m" | "15m" | "4h";
 
 async function postInfo<TResponse>(body: unknown): Promise<TResponse> {
   await applyDevDelay();
@@ -124,13 +131,13 @@ export async function fetchAthSnapshot(now = Date.now()): Promise<AthSnapshot> {
   };
 }
 
-export async function fetchSpotChartCandles(now = Date.now()): Promise<ChartCandle[]> {
+export async function fetchSpotChartCandles(interval: ChartInterval = "4h", now = Date.now()): Promise<ChartCandle[]> {
   const rawCandles = await postInfo<Candle[]>({
     type: "candleSnapshot",
     req: {
       coin: HYPE_SPOT_COIN,
-      interval: "4h",
-      startTime: Math.max(0, now - CHART_LOOKBACK_MS),
+      interval,
+      startTime: Math.max(0, now - CHART_LOOKBACK_MS_BY_INTERVAL[interval]),
       endTime: now,
     },
   });

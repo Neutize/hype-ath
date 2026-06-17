@@ -9,7 +9,7 @@ import {
   type ISeriesApi,
   type UTCTimestamp,
 } from "lightweight-charts";
-import { type ChartCandle, fetchSpotChartCandles } from "./hyperliquid";
+import { type ChartCandle, type ChartInterval, fetchSpotChartCandles } from "./hyperliquid";
 
 type ChartStatus = "idle" | "loading" | "ready" | "error";
 
@@ -21,45 +21,70 @@ type HypeChartProps = {
 const UP_COLOR = "#00D5C1";
 const DOWN_COLOR = "#FF6687";
 const INK = "#00241E";
+const DEFAULT_INTERVAL: ChartInterval = "4h";
 const REFRESH_INTERVAL_MS = 60_000;
+const RIGHT_OFFSET_BARS = 28;
+const VISIBLE_BARS_BY_INTERVAL: Record<ChartInterval, number> = {
+  "1m": 160,
+  "15m": 120,
+  "4h": 96,
+};
+const CHART_INTERVALS: Array<{ label: string; value: ChartInterval }> = [
+  { label: "1m", value: "1m" },
+  { label: "15m", value: "15m" },
+  { label: "4H", value: "4h" },
+];
 
 export function HypeChart({ latestPrice, visible }: HypeChartProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  const hasCandlesRef = useRef(false);
+  const hasAppliedInitialRangeRef = useRef(false);
+  const requestIdRef = useRef(0);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const [candles, setCandles] = useState<ChartCandle[]>([]);
+  const [selectedInterval, setSelectedInterval] = useState<ChartInterval>(DEFAULT_INTERVAL);
   const [status, setStatus] = useState<ChartStatus>("idle");
   const [error, setError] = useState<string | undefined>();
 
   const loadCandles = useCallback(async (showLoading = false) => {
+    const requestId = requestIdRef.current + 1;
+
+    requestIdRef.current = requestId;
+
     if (showLoading) {
       setStatus((current) => (current === "ready" ? current : "loading"));
     }
 
     try {
-      const nextCandles = await fetchSpotChartCandles();
+      const nextCandles = await fetchSpotChartCandles(selectedInterval);
+
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
 
       if (nextCandles.length < 2) {
         throw new Error("Not enough HYPE candles yet.");
       }
 
-      hasCandlesRef.current = true;
       setCandles(nextCandles);
       setError(undefined);
       setStatus("ready");
     } catch {
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+
       setError("HYPE chart is temporarily unavailable.");
       setStatus((current) => (current === "ready" ? "ready" : "error"));
     }
-  }, []);
+  }, [selectedInterval]);
 
   useEffect(() => {
     if (!visible) {
       return;
     }
 
-    void loadCandles(!hasCandlesRef.current);
+    void loadCandles(true);
     const refreshId = window.setInterval(() => void loadCandles(false), REFRESH_INTERVAL_MS);
 
     return () => window.clearInterval(refreshId);
@@ -82,7 +107,7 @@ export function HypeChart({ latestPrice, visible }: HypeChartProps) {
   useEffect(() => {
     const container = containerRef.current;
 
-    if (!visible || !container || chartData.length === 0) {
+    if (!visible || !container) {
       return;
     }
 
@@ -112,8 +137,9 @@ export function HypeChart({ latestPrice, visible }: HypeChartProps) {
       timeScale: {
         borderColor: "rgba(0, 36, 30, 0.12)",
         fixLeftEdge: true,
-        fixRightEdge: true,
-        rightOffset: 6,
+        fixRightEdge: false,
+        rightOffset: RIGHT_OFFSET_BARS,
+        rightBarStaysOnScroll: false,
         secondsVisible: false,
         timeVisible: true,
       },
@@ -153,8 +179,6 @@ export function HypeChart({ latestPrice, visible }: HypeChartProps) {
       chart.resize(Math.max(0, width), Math.max(0, height));
     });
 
-    series.setData(chartData);
-    chart.timeScale().fitContent();
     resizeObserver.observe(container);
     chartRef.current = chart;
     seriesRef.current = series;
@@ -165,7 +189,23 @@ export function HypeChart({ latestPrice, visible }: HypeChartProps) {
       chartRef.current = null;
       seriesRef.current = null;
     };
-  }, [chartData, visible]);
+  }, [visible]);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    const series = seriesRef.current;
+
+    if (!chart || !series || chartData.length === 0) {
+      return;
+    }
+
+    series.setData(chartData);
+
+    if (!hasAppliedInitialRangeRef.current) {
+      applyInitialVisibleRange(chart, chartData.length, selectedInterval);
+      hasAppliedInitialRangeRef.current = true;
+    }
+  }, [chartData, selectedInterval]);
 
   useEffect(() => {
     const series = seriesRef.current;
@@ -186,6 +226,19 @@ export function HypeChart({ latestPrice, visible }: HypeChartProps) {
     series.update(liveCandle);
   }, [candles, latestPrice]);
 
+  const handleIntervalChange = (nextInterval: ChartInterval) => {
+    if (nextInterval === selectedInterval) {
+      return;
+    }
+
+    hasAppliedInitialRangeRef.current = false;
+    requestIdRef.current += 1;
+    setCandles([]);
+    setError(undefined);
+    setStatus("loading");
+    setSelectedInterval(nextInterval);
+  };
+
   if (!visible) {
     return null;
   }
@@ -193,9 +246,22 @@ export function HypeChart({ latestPrice, visible }: HypeChartProps) {
   return (
     <div className="chart-panel" id="hype-chart-panel" aria-live="polite">
       <div className="chart-toolbar">
-        <div>
+        <div className="chart-heading">
           <span className="chart-title">$HYPE Spot</span>
-          <span className="chart-subtitle">4H candles</span>
+          <span className="chart-subtitle">{getIntervalLabel(selectedInterval)} candles</span>
+        </div>
+        <div className="chart-timeframes" role="group" aria-label="Chart timeframe">
+          {CHART_INTERVALS.map((interval) => (
+            <button
+              className="chart-timeframe"
+              type="button"
+              aria-pressed={selectedInterval === interval.value}
+              key={interval.value}
+              onClick={() => handleIntervalChange(interval.value)}
+            >
+              {interval.label}
+            </button>
+          ))}
         </div>
         <span className="chart-badge">Hyperliquid</span>
       </div>
@@ -239,4 +305,17 @@ export function HypeChart({ latestPrice, visible }: HypeChartProps) {
       </div>
     </div>
   );
+}
+
+function applyInitialVisibleRange(chart: IChartApi, dataLength: number, interval: ChartInterval) {
+  const visibleBars = Math.min(dataLength, VISIBLE_BARS_BY_INTERVAL[interval]);
+  const lastBarIndex = dataLength - 1;
+  const from = Math.max(0, dataLength - visibleBars);
+  const to = lastBarIndex + RIGHT_OFFSET_BARS;
+
+  chart.timeScale().setVisibleLogicalRange({ from, to });
+}
+
+function getIntervalLabel(interval: ChartInterval): string {
+  return CHART_INTERVALS.find((item) => item.value === interval)?.label ?? interval;
 }

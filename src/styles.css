@@ -243,6 +243,10 @@ h1 {
   gap: 8px;
 }
 
+.chart-heading {
+  min-width: 0;
+}
+
 .chart-title {
   color: var(--ink);
   font-size: 1.02rem;
@@ -266,6 +270,48 @@ h1 {
   font-weight: 780;
   line-height: 1;
   padding: 7px 10px;
+}
+
+.chart-timeframes {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border: 1px solid rgba(0, 213, 193, 0.24);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.58);
+  padding: 3px;
+}
+
+.chart-timeframe {
+  min-width: 42px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(0, 36, 30, 0.54);
+  cursor: pointer;
+  font-size: 0.76rem;
+  font-weight: 820;
+  line-height: 1;
+  padding: 8px 10px;
+  transition:
+    background 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.chart-timeframe:hover {
+  color: rgba(0, 36, 30, 0.72);
+  transform: translateY(-1px);
+}
+
+.chart-timeframe[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--ink);
+}
+
+.chart-timeframe:focus-visible {
+  outline: 3px solid rgba(0, 36, 30, 0.84);
+  outline-offset: 3px;
 }
 
 .chart-frame {
