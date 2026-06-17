@@ -16,6 +16,7 @@
 html {
   background: var(--surface);
   color: var(--ink);
+  scrollbar-gutter: stable;
 }
 
 body {
@@ -54,19 +55,26 @@ a {
 }
 
 .page-shell {
-  --page-padding-block: clamp(28px, 5vw, 72px);
+  --page-padding-top: clamp(12px, 1.4vw, 22px);
+  --page-padding-bottom: clamp(28px, 4vw, 62px);
   --page-padding-inline: clamp(28px, 5vw, 72px);
+  --topbar-height: 50px;
+  --topbar-gap: clamp(22px, 3vh, 38px);
+  --hero-min-height: max(
+    0px,
+    calc(100dvh - var(--page-padding-top) - var(--page-padding-bottom) - var(--topbar-height) - var(--topbar-gap))
+  );
 
   position: relative;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: clamp(24px, 3.2vh, 44px);
+  grid-template-rows: auto auto;
+  gap: var(--topbar-gap);
   min-height: 100dvh;
   align-items: stretch;
   justify-items: center;
   overflow-x: hidden;
   overflow-y: hidden;
-  padding: var(--page-padding-block) var(--page-padding-inline);
+  padding: var(--page-padding-top) var(--page-padding-inline) var(--page-padding-bottom);
   background:
     linear-gradient(90deg, rgba(0, 213, 193, 0.08) 1px, transparent 1px),
     linear-gradient(180deg, rgba(0, 213, 193, 0.06) 1px, transparent 1px),
@@ -83,7 +91,7 @@ a {
   z-index: 2;
   display: grid;
   width: min(100%, 1120px);
-  min-height: 50px;
+  min-height: var(--topbar-height);
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: clamp(12px, 2vw, 24px);
@@ -185,8 +193,8 @@ a {
   z-index: 1;
   display: grid;
   width: min(100%, 1120px);
-  min-height: 0;
-  align-self: stretch;
+  min-height: var(--hero-min-height);
+  align-self: start;
   align-content: center;
   justify-items: center;
   gap: clamp(34px, 5vh, 58px);
@@ -199,7 +207,7 @@ a {
   display: grid;
   width: min(100%, 1120px);
   justify-items: center;
-  padding-bottom: var(--page-padding-block);
+  padding-bottom: var(--page-padding-bottom);
 }
 
 .chart-region:empty {
@@ -943,8 +951,11 @@ h1 {
 
 @media (max-width: 720px) {
   .page-shell {
-    --page-padding-block: 28px;
+    --page-padding-top: 12px;
+    --page-padding-bottom: 28px;
     --page-padding-inline: 18px;
+    --topbar-height: 46px;
+    --topbar-gap: 22px;
   }
 
   h1 {

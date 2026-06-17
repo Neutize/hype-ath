@@ -23,11 +23,15 @@ const DOWN_COLOR = "#FF6687";
 const INK = "#00241E";
 const DEFAULT_INTERVAL: ChartInterval = "4h";
 const REFRESH_INTERVAL_MS = 60_000;
-const RIGHT_OFFSET_BARS = 28;
 const VISIBLE_BARS_BY_INTERVAL: Record<ChartInterval, number> = {
   "1m": 160,
   "15m": 120,
   "4h": 96,
+};
+const FUTURE_BARS_BY_INTERVAL: Record<ChartInterval, number> = {
+  "1m": 20,
+  "15m": 18,
+  "4h": 16,
 };
 const CHART_INTERVALS: Array<{ label: string; value: ChartInterval }> = [
   { label: "1m", value: "1m" },
@@ -136,9 +140,9 @@ export function HypeChart({ latestPrice, visible }: HypeChartProps) {
       },
       timeScale: {
         borderColor: "rgba(0, 36, 30, 0.12)",
-        fixLeftEdge: true,
+        fixLeftEdge: false,
         fixRightEdge: false,
-        rightOffset: RIGHT_OFFSET_BARS,
+        rightOffset: FUTURE_BARS_BY_INTERVAL[selectedInterval],
         rightBarStaysOnScroll: false,
         secondsVisible: false,
         timeVisible: true,
@@ -307,10 +311,12 @@ export function HypeChart({ latestPrice, visible }: HypeChartProps) {
 }
 
 function applyInitialVisibleRange(chart: IChartApi, dataLength: number, interval: ChartInterval) {
-  const visibleBars = Math.min(dataLength, VISIBLE_BARS_BY_INTERVAL[interval]);
+  const visibleBars = VISIBLE_BARS_BY_INTERVAL[interval];
+  const futureBars = FUTURE_BARS_BY_INTERVAL[interval];
   const lastBarIndex = dataLength - 1;
-  const from = Math.max(0, dataLength - visibleBars);
-  const to = lastBarIndex + RIGHT_OFFSET_BARS;
+  const sparseLeftPadding = Math.max(0, Math.round((visibleBars - dataLength) / 2));
+  const from = dataLength < visibleBars ? -sparseLeftPadding : Math.max(0, dataLength - visibleBars + futureBars);
+  const to = dataLength < visibleBars ? from + visibleBars : lastBarIndex + futureBars;
 
   chart.timeScale().setVisibleLogicalRange({ from, to });
 }
