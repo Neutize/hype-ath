@@ -33,13 +33,17 @@ a {
 }
 
 .page-shell {
+  --page-padding-block: clamp(28px, 5vw, 72px);
+  --page-padding-inline: clamp(28px, 5vw, 72px);
+
   position: relative;
   display: grid;
   min-height: 100dvh;
-  place-items: center;
+  align-items: start;
+  justify-items: center;
   overflow-x: hidden;
   overflow-y: auto;
-  padding: clamp(28px, 5vw, 72px);
+  padding: var(--page-padding-block) var(--page-padding-inline);
   background:
     linear-gradient(90deg, rgba(0, 213, 193, 0.08) 1px, transparent 1px),
     linear-gradient(180deg, rgba(0, 213, 193, 0.06) 1px, transparent 1px),
@@ -52,9 +56,20 @@ a {
   z-index: 1;
   display: grid;
   width: min(100%, 1120px);
+  min-height: calc(100dvh - var(--page-padding-block) - var(--page-padding-block));
+  align-content: center;
   justify-items: center;
   gap: 24px;
   text-align: center;
+}
+
+.chart-region {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: min(100%, 1120px);
+  justify-items: center;
+  padding-bottom: var(--page-padding-block);
 }
 
 h1,
@@ -634,7 +649,8 @@ h1 {
 
 @media (max-width: 720px) {
   .page-shell {
-    padding: 28px 18px;
+    --page-padding-block: 28px;
+    --page-padding-inline: 18px;
   }
 
   h1 {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   type AthSnapshot,
   fetchAthSnapshot,
@@ -51,6 +51,7 @@ const getInitialMarket = (): MarketState => ({
 export default function App() {
   const [market, setMarket] = useState<MarketState>(getInitialMarket);
   const [isChartOpen, setIsChartOpen] = useState(false);
+  const scrollCleanupRef = useRef<(() => void) | undefined>(undefined);
 
   const refreshMarket = useCallback(async (showLoading = false) => {
     if (showLoading) {
@@ -227,7 +228,6 @@ export default function App() {
       return;
     }
 
-    let animationId: number | undefined;
     const scrollId = window.setTimeout(() => {
       const chartPanel = document.getElementById("hype-chart-panel");
       const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -244,35 +244,23 @@ export default function App() {
         return;
       }
 
-      const distance = targetScroll - startScroll;
-
-      if (Math.abs(distance) < 1) {
-        return;
-      }
-
-      const startTime = window.performance.now();
-
-      const animateScroll = (now: number) => {
-        const progress = Math.min((now - startTime) / CHART_SCROLL_DURATION_MS, 1);
-        const nextScroll = startScroll + distance * easeInOutCubic(progress);
-
-        window.scrollTo(0, nextScroll);
-
-        if (progress < 1) {
-          animationId = window.requestAnimationFrame(animateScroll);
-        }
-      };
-
-      animationId = window.requestAnimationFrame(animateScroll);
+      scrollCleanupRef.current?.();
+      scrollCleanupRef.current = animateWindowScroll(startScroll, targetScroll, CHART_SCROLL_DURATION_MS, () => {
+        scrollCleanupRef.current = undefined;
+      });
     }, CHART_SCROLL_DELAY_MS);
 
     return () => {
       window.clearTimeout(scrollId);
-      if (animationId) {
-        window.cancelAnimationFrame(animationId);
-      }
     };
   }, [isChartOpen]);
+
+  useEffect(
+    () => () => {
+      scrollCleanupRef.current?.();
+    },
+    [],
+  );
 
   const answer = market.ath?.hitNewAthToday;
   const isAnswerLoading = answer === undefined && market.snapshotStatus === "loading";
@@ -290,6 +278,26 @@ export default function App() {
   const notice = getMarketNotice(market);
   const isBusy = isAnswerLoading || isPriceLoading || market.isRefreshing;
   const statusText = getMarketStatus(market);
+  const toggleChart = useCallback(() => {
+    scrollCleanupRef.current?.();
+
+    if (!isChartOpen) {
+      setIsChartOpen(true);
+      return;
+    }
+
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (prefersReducedMotion || window.scrollY < 2) {
+      setIsChartOpen(false);
+      return;
+    }
+
+    scrollCleanupRef.current = animateWindowScroll(window.scrollY, 0, CHART_SCROLL_DURATION_MS, () => {
+      scrollCleanupRef.current = undefined;
+      setIsChartOpen(false);
+    });
+  }, [isChartOpen]);
 
   return (
     <main className="page-shell">
@@ -319,7 +327,7 @@ export default function App() {
             type="button"
             aria-controls="hype-chart-panel"
             aria-expanded={isChartOpen}
-            onClick={() => setIsChartOpen((current) => !current)}
+            onClick={toggleChart}
           >
             <span>{isChartOpen ? "Hide chart" : "Show chart"}</span>
             <svg className="chart-arrow" viewBox="0 0 16 10" aria-hidden="true">
@@ -327,7 +335,6 @@ export default function App() {
             </svg>
           </button>
         </div>
-        <HypeChart latestPrice={market.price} visible={isChartOpen} />
         {notice ? (
           <div className="market-notice" role="status">
             <div>
@@ -340,6 +347,10 @@ export default function App() {
           </div>
         ) : null}
       </section>
+
+      <div className="chart-region">
+        <HypeChart latestPrice={market.price} visible={isChartOpen} />
+      </div>
 
       <p className="visually-hidden">{statusText}</p>
     </main>
@@ -449,6 +460,53 @@ function getChartScrollTarget(chartPanel: HTMLElement): number {
   const centeredScroll = window.scrollY + panelRect.top - Math.max(24, (window.innerHeight - panelRect.height) / 2);
 
   return Math.min(Math.max(centeredScroll, 0), maxScroll);
+}
+
+function animateWindowScroll(
+  startScroll: number,
+  targetScroll: number,
+  duration: number,
+  onComplete?: () => void,
+): () => void {
+  const distance = targetScroll - startScroll;
+  let animationId: number | undefined;
+  let isCancelled = false;
+
+  if (Math.abs(distance) < 1) {
+    window.scrollTo(0, targetScroll);
+    onComplete?.();
+    return () => undefined;
+  }
+
+  const startTime = window.performance.now();
+
+  const animateScroll = (now: number) => {
+    if (isCancelled) {
+      return;
+    }
+
+    const progress = Math.min((now - startTime) / duration, 1);
+    const nextScroll = startScroll + distance * easeInOutCubic(progress);
+
+    window.scrollTo(0, nextScroll);
+
+    if (progress < 1) {
+      animationId = window.requestAnimationFrame(animateScroll);
+      return;
+    }
+
+    onComplete?.();
+  };
+
+  animationId = window.requestAnimationFrame(animateScroll);
+
+  return () => {
+    isCancelled = true;
+
+    if (animationId) {
+      window.cancelAnimationFrame(animationId);
+    }
+  };
 }
 
 function easeInOutCubic(progress: number): number {
