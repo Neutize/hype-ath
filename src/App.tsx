@@ -7,6 +7,7 @@ import {
   HYPE_SPOT_COIN,
   HYPERLIQUID_WS_URL,
 } from "./hyperliquid";
+import { HypeChart } from "./HypeChart";
 
 type RequestStatus = "loading" | "ready" | "stale" | "error";
 
@@ -33,7 +34,6 @@ type AllMidsMessage = {
 };
 
 const TRADE_URL = "https://app.hyperliquid.xyz/join/NEUTIZE";
-const CHART_URL = "https://app.hyperliquid.xyz/trade/HYPE/USDC";
 const PRICE_FALLBACK_INTERVAL_MS = 12_000;
 const RECONNECT_DELAY_MS = 2_500;
 const SNAPSHOT_REFRESH_INTERVAL_MS = 60_000;
@@ -48,6 +48,7 @@ const getInitialMarket = (): MarketState => ({
 
 export default function App() {
   const [market, setMarket] = useState<MarketState>(getInitialMarket);
+  const [isChartOpen, setIsChartOpen] = useState(false);
 
   const refreshMarket = useCallback(async (showLoading = false) => {
     if (showLoading) {
@@ -259,13 +260,20 @@ export default function App() {
           <a className="trade-button" href={TRADE_URL} target="_blank" rel="noreferrer">
             Trade
           </a>
-          <a className="chart-link" href={CHART_URL} target="_blank" rel="noreferrer">
-            <span>Show chart</span>
+          <button
+            className="chart-link"
+            type="button"
+            aria-controls="hype-chart-panel"
+            aria-expanded={isChartOpen}
+            onClick={() => setIsChartOpen((current) => !current)}
+          >
+            <span>{isChartOpen ? "Hide chart" : "Show chart"}</span>
             <svg className="chart-arrow" viewBox="0 0 16 10" aria-hidden="true">
               <path d="M2 2L8 8L14 2" />
             </svg>
-          </a>
+          </button>
         </div>
+        <HypeChart latestPrice={market.price} visible={isChartOpen} />
         {notice ? (
           <div className="market-notice" role="status">
             <div>

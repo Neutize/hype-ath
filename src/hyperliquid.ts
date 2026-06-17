@@ -4,6 +4,7 @@ export const HYPERLIQUID_WS_URL = "wss://api.hyperliquid.xyz/ws";
 
 type MidsResponse = Record<string, string>;
 const INFO_TIMEOUT_MS = 10_000;
+const CHART_LOOKBACK_MS = 1000 * 60 * 60 * 24 * 120;
 
 export type Candle = {
   t: number;
@@ -25,6 +26,14 @@ export type AthSnapshot = {
   priorAth: number;
   todayHigh: number;
   utcDay: string;
+};
+
+export type ChartCandle = {
+  close: number;
+  high: number;
+  low: number;
+  open: number;
+  time: number;
 };
 
 async function postInfo<TResponse>(body: unknown): Promise<TResponse> {
@@ -115,6 +124,29 @@ export async function fetchAthSnapshot(now = Date.now()): Promise<AthSnapshot> {
   };
 }
 
+export async function fetchSpotChartCandles(now = Date.now()): Promise<ChartCandle[]> {
+  const rawCandles = await postInfo<Candle[]>({
+    type: "candleSnapshot",
+    req: {
+      coin: HYPE_SPOT_COIN,
+      interval: "4h",
+      startTime: Math.max(0, now - CHART_LOOKBACK_MS),
+      endTime: now,
+    },
+  });
+  const candles = normalizeCandles(rawCandles)
+    .map(toChartCandle)
+    .filter((candle): candle is ChartCandle => candle !== undefined)
+    .sort((a, b) => a.time - b.time);
+  const uniqueByTime = new Map<number, ChartCandle>();
+
+  for (const candle of candles) {
+    uniqueByTime.set(candle.time, candle);
+  }
+
+  return [...uniqueByTime.values()];
+}
+
 export function formatUsd(value: number | undefined): string {
   if (!Number.isFinite(value)) {
     return "$--";
@@ -140,7 +172,31 @@ function normalizeCandles(candles: Candle[]): Candle[] {
     return [];
   }
 
-  return candles.filter((candle) => Number.isFinite(Number(candle.t)) && Number.isFinite(Number(candle.h)));
+  return candles.filter((candle) => {
+    const values = [candle.t, candle.o, candle.h, candle.l, candle.c].map(Number);
+
+    return values.every(Number.isFinite);
+  });
+}
+
+function toChartCandle(candle: Candle): ChartCandle | undefined {
+  const time = Math.floor(Number(candle.t) / 1000);
+  const open = Number(candle.o);
+  const high = Number(candle.h);
+  const low = Number(candle.l);
+  const close = Number(candle.c);
+
+  if (![time, open, high, low, close].every(Number.isFinite)) {
+    return undefined;
+  }
+
+  return {
+    close,
+    high,
+    low,
+    open,
+    time,
+  };
 }
 
 function getDevFailureMode(body: unknown): string | undefined {
