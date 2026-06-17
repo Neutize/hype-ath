@@ -10,6 +10,7 @@ import {
 import { HypeChart } from "./HypeChart";
 
 type RequestStatus = "loading" | "ready" | "stale" | "error";
+type PriceDirection = "up" | "down";
 
 type MarketState = {
   ath?: AthSnapshot;
@@ -51,7 +52,10 @@ const getInitialMarket = (): MarketState => ({
 export default function App() {
   const [market, setMarket] = useState<MarketState>(getInitialMarket);
   const [isChartOpen, setIsChartOpen] = useState(false);
+  const [priceMotion, setPriceMotion] = useState<{ direction?: PriceDirection; pulse: number }>({ pulse: 0 });
+  const cursorCloudRef = useRef<HTMLDivElement | null>(null);
   const pendingChartScrollRef = useRef<(() => void) | undefined>(undefined);
+  const previousPriceRef = useRef<number | undefined>(undefined);
   const scrollCleanupRef = useRef<(() => void) | undefined>(undefined);
 
   const refreshMarket = useCallback(async (showLoading = false) => {
@@ -232,6 +236,72 @@ export default function App() {
     [],
   );
 
+  useEffect(() => {
+    const price = Number(market.price);
+
+    if (!Number.isFinite(price)) {
+      return;
+    }
+
+    const previousPrice = previousPriceRef.current;
+
+    if (previousPrice !== undefined && Math.abs(price - previousPrice) > 0.0000001) {
+      setPriceMotion((current) => ({
+        direction: price > previousPrice ? "up" : "down",
+        pulse: current.pulse + 1,
+      }));
+    }
+
+    previousPriceRef.current = price;
+  }, [market.price]);
+
+  useEffect(() => {
+    const cloud = cursorCloudRef.current;
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const coarsePointer = window.matchMedia("(pointer: coarse)").matches;
+
+    if (!cloud || prefersReducedMotion || coarsePointer) {
+      return;
+    }
+
+    let frameId: number | undefined;
+    let isVisible = false;
+    let nextX = 0;
+    let nextY = 0;
+
+    const paintCloud = () => {
+      cloud.style.transform = `translate3d(${nextX}px, ${nextY}px, 0)`;
+      frameId = undefined;
+    };
+
+    const handlePointerMove = (event: PointerEvent) => {
+      if (event.pointerType === "touch") {
+        return;
+      }
+
+      nextX = event.clientX;
+      nextY = event.clientY;
+
+      if (!isVisible) {
+        isVisible = true;
+        cloud.dataset.visible = "true";
+      }
+
+      if (!frameId) {
+        frameId = window.requestAnimationFrame(paintCloud);
+      }
+    };
+
+    window.addEventListener("pointermove", handlePointerMove, { passive: true });
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      if (frameId) {
+        window.cancelAnimationFrame(frameId);
+      }
+    };
+  }, []);
+
   const answer = market.ath?.hitNewAthToday;
   const isAnswerLoading = answer === undefined && market.snapshotStatus === "loading";
   const isPriceLoading = market.price === undefined && market.priceStatus === "loading";
@@ -245,6 +315,12 @@ export default function App() {
     .join(" ");
   const priceClass = ["price", market.price === undefined ? "price-pending" : ""].filter(Boolean).join(" ");
   const priceText = useMemo(() => formatUsd(market.price), [market.price]);
+  const priceValueClass = [
+    "price-value",
+    priceMotion.direction === "up" ? "tick-up" : priceMotion.direction === "down" ? "tick-down" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
   const notice = getMarketNotice(market);
   const answerNotice = market.snapshotStatus === "error" ? notice : undefined;
   const secondaryNotice = answerNotice ? undefined : notice;
@@ -275,6 +351,7 @@ export default function App() {
 
   return (
     <main className="page-shell">
+      <div className="cursor-cloud" ref={cursorCloudRef} aria-hidden="true" />
       <div className="logo-field" aria-hidden="true">
         <div className="logo-mark logo-mark-a" />
         <div className="logo-mark logo-mark-b" />
@@ -284,7 +361,9 @@ export default function App() {
       </div>
 
       <section className="content-stack" aria-busy={isBusy} aria-live="polite">
-        <h1>Did $HYPE hit a new ATH today?</h1>
+        <h1>
+          Did <span className="ticker-highlight">$HYPE</span> hit a new ATH today?
+        </h1>
         {answerNotice ? (
           <div className="market-notice answer-notice" role="status">
             <div>
@@ -301,12 +380,26 @@ export default function App() {
           </p>
         )}
         <p className={priceClass}>
-          Current price:{" "}
-          {isPriceLoading ? <span className="shimmer price-shimmer" aria-hidden="true" /> : priceText}
+          <span className="price-label">Current price:</span>{" "}
+          {isPriceLoading ? (
+            <span className="shimmer price-shimmer" aria-hidden="true" />
+          ) : (
+            <>
+              <span className={priceValueClass} key={priceMotion.pulse}>
+                {priceText}
+              </span>
+              <span className="price-direction" data-direction={priceMotion.direction} aria-hidden="true">
+                {priceMotion.direction === "up" ? "▲" : priceMotion.direction === "down" ? "▼" : ""}
+              </span>
+            </>
+          )}
         </p>
         <div className="actions-stack">
           <a className="trade-button" href={TRADE_URL} target="_blank" rel="noreferrer">
-            Trade
+            <span>Trade</span>
+            <span className="trade-arrow" aria-hidden="true">
+              →
+            </span>
           </a>
           <button
             className="chart-link"
@@ -321,6 +414,14 @@ export default function App() {
             </svg>
           </button>
         </div>
+        {market.ath ? (
+          <p className="ath-meta" aria-label={`All-time high ${formatUsd(market.ath.allTimeHigh)} set ${formatAthDate(market.ath.allTimeHighDay)}`}>
+            <span>All-time high</span>
+            <strong>{formatUsd(market.ath.allTimeHigh)}</strong>
+            <span className="ath-meta-dot" aria-hidden="true" />
+            <span>set {formatAthDate(market.ath.allTimeHighDay)}</span>
+          </p>
+        ) : null}
         {secondaryNotice ? (
           <div className="market-notice" role="status">
             <div>
@@ -347,8 +448,15 @@ function foldPriceIntoState(state: MarketState, price: number, isRealtime: boole
   const ath = state.ath ? { ...state.ath } : undefined;
 
   if (ath) {
-    ath.todayHigh = Math.max(ath.todayHigh, price);
-    ath.allTimeHigh = Math.max(ath.allTimeHigh, ath.todayHigh);
+    const nextTodayHigh = Math.max(ath.todayHigh, price);
+
+    ath.todayHigh = nextTodayHigh;
+
+    if (nextTodayHigh > ath.allTimeHigh) {
+      ath.allTimeHigh = nextTodayHigh;
+      ath.allTimeHighDay = ath.utcDay;
+    }
+
     ath.hitNewAthToday = Number.isFinite(ath.priorAth) ? ath.todayHigh > ath.priorAth : true;
   }
 
@@ -437,6 +545,21 @@ function getMarketNotice(market: MarketState): { body: string; title: string } |
 
 function getOnlineStatus(): boolean {
   return typeof navigator === "undefined" ? true : navigator.onLine;
+}
+
+function formatAthDate(isoDay: string): string {
+  const [year, month, day] = isoDay.split("-").map(Number);
+
+  if (![year, month, day].every(Number.isFinite)) {
+    return isoDay;
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+    year: "numeric",
+  }).format(new Date(Date.UTC(year, month - 1, day)));
 }
 
 function getChartScrollTarget(chartPanel: HTMLElement): number {

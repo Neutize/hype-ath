@@ -32,6 +32,26 @@ a {
   font: inherit;
 }
 
+.cursor-cloud {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  width: 760px;
+  height: 760px;
+  margin: -380px 0 0 -380px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0, 213, 193, 0.16), transparent 62%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 420ms ease;
+  will-change: transform, opacity;
+}
+
+.cursor-cloud[data-visible="true"] {
+  opacity: 1;
+}
+
 .page-shell {
   --page-padding-block: clamp(28px, 5vw, 72px);
   --page-padding-inline: clamp(28px, 5vw, 72px);
@@ -78,12 +98,17 @@ p {
 }
 
 h1 {
-  max-width: 12.2ch;
-  font-size: 7.4rem;
-  font-weight: 850;
+  max-width: 100%;
+  font-size: 4rem;
+  font-weight: 760;
   letter-spacing: 0;
-  line-height: 0.9;
-  text-wrap: balance;
+  line-height: 1.08;
+  white-space: nowrap;
+}
+
+.ticker-highlight {
+  color: var(--accent);
+  font-weight: 850;
 }
 
 .answer {
@@ -110,9 +135,14 @@ h1 {
 }
 
 .price {
-  color: var(--ink);
-  font-size: 4rem;
-  font-weight: 780;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.48ch;
+  color: var(--muted);
+  font-size: 2.6rem;
+  font-weight: 660;
   letter-spacing: 0;
   line-height: 1;
   text-wrap: balance;
@@ -120,6 +150,49 @@ h1 {
 
 .price-pending {
   color: rgba(0, 36, 30, 0.42);
+}
+
+.price-label {
+  color: rgba(0, 36, 30, 0.58);
+}
+
+.price-value {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  font-weight: 820;
+}
+
+.price-direction {
+  display: inline-block;
+  min-width: 1ch;
+  font-size: 0.56em;
+  font-weight: 900;
+  opacity: 0;
+  transform: translateY(0);
+  transition:
+    color 180ms ease,
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.price-direction[data-direction="up"] {
+  color: var(--accent);
+  opacity: 1;
+  transform: translateY(-0.1em);
+}
+
+.price-direction[data-direction="down"] {
+  color: var(--danger);
+  opacity: 1;
+  transform: translateY(0.12em);
+}
+
+.price-value.tick-up {
+  animation: price-tick-up 700ms ease-out;
+}
+
+.price-value.tick-down {
+  animation: price-tick-down 700ms ease-out;
 }
 
 .actions-stack {
@@ -134,6 +207,7 @@ h1 {
   min-height: 58px;
   align-items: center;
   justify-content: center;
+  gap: 10px;
   border: 1px solid rgba(0, 36, 30, 0.08);
   border-radius: 999px;
   background: var(--accent);
@@ -150,9 +224,20 @@ h1 {
   white-space: nowrap;
 }
 
+.trade-arrow {
+  display: inline-block;
+  font-size: 1.12em;
+  line-height: 1;
+  transition: transform 180ms ease;
+}
+
 .trade-button:hover {
   box-shadow: 0 24px 70px rgba(0, 213, 193, 0.42);
   transform: translateY(-2px);
+}
+
+.trade-button:hover .trade-arrow {
+  transform: translateX(4px);
 }
 
 .trade-button:active {
@@ -213,6 +298,40 @@ h1 {
 
 .chart-link[aria-expanded="true"] .chart-arrow {
   transform: rotate(180deg);
+}
+
+.ath-meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  margin-top: -2px;
+  color: rgba(0, 36, 30, 0.52);
+  font-family:
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    "Liberation Mono",
+    monospace;
+  font-size: 0.9rem;
+  font-weight: 720;
+  line-height: 1.35;
+}
+
+.ath-meta strong {
+  color: var(--ink);
+  font-weight: 860;
+}
+
+.ath-meta-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.42;
 }
 
 .chart-panel {
@@ -648,6 +767,28 @@ h1 {
   }
 }
 
+@keyframes price-tick-up {
+  0% {
+    color: var(--accent);
+    text-shadow: 0 0 28px rgba(0, 213, 193, 0.34);
+  }
+  100% {
+    color: var(--ink);
+    text-shadow: none;
+  }
+}
+
+@keyframes price-tick-down {
+  0% {
+    color: var(--danger);
+    text-shadow: 0 0 28px rgba(255, 102, 135, 0.3);
+  }
+  100% {
+    color: var(--ink);
+    text-shadow: none;
+  }
+}
+
 @keyframes float-a {
   0%,
   100% {
@@ -705,8 +846,9 @@ h1 {
   }
 
   h1 {
-    max-width: 9.8ch;
-    font-size: 3.65rem;
+    max-width: 100%;
+    font-size: 2.1rem;
+    white-space: nowrap;
   }
 
   .answer {
@@ -714,7 +856,7 @@ h1 {
   }
 
   .price {
-    font-size: 2rem;
+    font-size: 1.75rem;
   }
 
   .trade-button {
@@ -770,7 +912,7 @@ h1 {
   }
 
   h1 {
-    font-size: 8.6rem;
+    font-size: 4.8rem;
   }
 
   .answer {
@@ -778,13 +920,13 @@ h1 {
   }
 
   .price {
-    font-size: 5rem;
+    font-size: 3rem;
   }
 }
 
 @media (max-width: 1080px) and (min-width: 721px) {
   h1 {
-    font-size: 6.2rem;
+    font-size: 3rem;
   }
 
   .answer {
@@ -792,7 +934,7 @@ h1 {
   }
 
   .price {
-    font-size: 3.35rem;
+    font-size: 2.2rem;
   }
 }
 
@@ -802,8 +944,8 @@ h1 {
   }
 
   h1 {
-    font-size: 5.85rem;
-    max-width: 13.5ch;
+    max-width: 100%;
+    font-size: 3rem;
   }
 
   .answer {
@@ -811,11 +953,37 @@ h1 {
   }
 
   .price {
-    font-size: 3.15rem;
+    font-size: 2.1rem;
   }
 
   .trade-button {
     min-height: 54px;
     padding: 16px 32px 17px;
+  }
+}
+
+@media (max-width: 420px) {
+  h1 {
+    font-size: 1.45rem;
+  }
+
+  .price {
+    font-size: 1.42rem;
+  }
+
+  .ath-meta {
+    font-size: 0.78rem;
+  }
+}
+
+@media (max-width: 360px) {
+  h1 {
+    white-space: normal;
+  }
+}
+
+@media (prefers-reduced-motion: reduce), (pointer: coarse) {
+  .cursor-cloud {
+    display: none;
   }
 }
