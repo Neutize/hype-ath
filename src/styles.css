@@ -75,7 +75,7 @@ a {
 }
 
 .page-shell.has-chart {
-  overflow-y: auto;
+  overflow-y: visible;
 }
 
 .topbar {

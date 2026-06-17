@@ -398,13 +398,26 @@ export default function App() {
     return market.stats?.marketCap;
   }, [displayPrice, market.stats]);
   const statusText = getMarketStatus(market);
+  useEffect(() => {
+    if (!isChartOpen) {
+      return;
+    }
+
+    pendingChartScrollRef.current?.();
+    pendingChartScrollRef.current = scheduleChartScroll(scrollCleanupRef);
+
+    return () => {
+      pendingChartScrollRef.current?.();
+      pendingChartScrollRef.current = undefined;
+    };
+  }, [isChartOpen]);
+
   const toggleChart = useCallback(() => {
     pendingChartScrollRef.current?.();
     scrollCleanupRef.current?.();
 
     if (!isChartOpen) {
       setIsChartOpen(true);
-      pendingChartScrollRef.current = scheduleChartScroll(scrollCleanupRef);
       return;
     }
 
@@ -727,6 +740,11 @@ function scheduleChartScroll(scrollCleanupRef: { current: (() => void) | undefin
 
       const startScroll = getPageScroll();
       const targetScroll = getChartScrollTarget(chartPanel);
+
+      if (attempt < 12 && targetScroll <= startScroll && chartPanel.getBoundingClientRect().bottom > window.innerHeight + 8) {
+        frameId = window.requestAnimationFrame(() => startChartScroll(attempt + 1));
+        return;
+      }
 
       if (prefersReducedMotion) {
         setPageScroll(targetScroll);
