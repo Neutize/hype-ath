@@ -220,6 +220,25 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isChartOpen) {
+      return;
+    }
+
+    const scrollId = window.setTimeout(() => {
+      const chartPanel = document.getElementById("hype-chart-panel");
+      const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      chartPanel?.scrollIntoView({
+        behavior: prefersReducedMotion ? "auto" : "smooth",
+        block: "center",
+        inline: "nearest",
+      });
+    }, 80);
+
+    return () => window.clearTimeout(scrollId);
+  }, [isChartOpen]);
+
   const answer = market.ath?.hitNewAthToday;
   const isAnswerLoading = answer === undefined && market.snapshotStatus === "loading";
   const isPriceLoading = market.price === undefined && market.priceStatus === "loading";
