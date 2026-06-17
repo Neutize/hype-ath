@@ -195,6 +195,12 @@ h1 {
   animation: price-tick-down 700ms ease-out;
 }
 
+.price-stack {
+  display: grid;
+  justify-items: center;
+  gap: 9px;
+}
+
 .actions-stack {
   display: grid;
   justify-items: center;
@@ -306,7 +312,6 @@ h1 {
   align-items: center;
   justify-content: center;
   gap: 9px;
-  margin-top: -2px;
   color: rgba(0, 36, 30, 0.52);
   font-family:
     ui-monospace,

@@ -379,21 +379,34 @@ export default function App() {
             {isAnswerLoading ? <span className="shimmer answer-shimmer" aria-hidden="true" /> : answerText}
           </p>
         )}
-        <p className={priceClass}>
-          <span className="price-label">Current price:</span>{" "}
-          {isPriceLoading ? (
-            <span className="shimmer price-shimmer" aria-hidden="true" />
-          ) : (
-            <>
-              <span className={priceValueClass} key={priceMotion.pulse}>
-                {priceText}
-              </span>
-              <span className="price-direction" data-direction={priceMotion.direction} aria-hidden="true">
-                {priceMotion.direction === "up" ? "▲" : priceMotion.direction === "down" ? "▼" : ""}
-              </span>
-            </>
-          )}
-        </p>
+        <div className="price-stack">
+          <p className={priceClass}>
+            <span className="price-label">Current price:</span>{" "}
+            {isPriceLoading ? (
+              <span className="shimmer price-shimmer" aria-hidden="true" />
+            ) : (
+              <>
+                <span className={priceValueClass} key={priceMotion.pulse}>
+                  {priceText}
+                </span>
+                <span className="price-direction" data-direction={priceMotion.direction} aria-hidden="true">
+                  {priceMotion.direction === "up" ? "▲" : priceMotion.direction === "down" ? "▼" : ""}
+                </span>
+              </>
+            )}
+          </p>
+          {market.ath ? (
+            <p
+              className="ath-meta"
+              aria-label={`All-time high ${formatUsd(market.ath.allTimeHigh)} set ${formatAthDate(market.ath.allTimeHighDay)}`}
+            >
+              <span>All-time high</span>
+              <strong>{formatUsd(market.ath.allTimeHigh)}</strong>
+              <span className="ath-meta-dot" aria-hidden="true" />
+              <span>set {formatAthDate(market.ath.allTimeHighDay)}</span>
+            </p>
+          ) : null}
+        </div>
         <div className="actions-stack">
           <a className="trade-button" href={TRADE_URL} target="_blank" rel="noreferrer">
             <span>Trade</span>
@@ -414,14 +427,6 @@ export default function App() {
             </svg>
           </button>
         </div>
-        {market.ath ? (
-          <p className="ath-meta" aria-label={`All-time high ${formatUsd(market.ath.allTimeHigh)} set ${formatAthDate(market.ath.allTimeHighDay)}`}>
-            <span>All-time high</span>
-            <strong>{formatUsd(market.ath.allTimeHigh)}</strong>
-            <span className="ath-meta-dot" aria-hidden="true" />
-            <span>set {formatAthDate(market.ath.allTimeHighDay)}</span>
-          </p>
-        ) : null}
         {secondaryNotice ? (
           <div className="market-notice" role="status">
             <div>
