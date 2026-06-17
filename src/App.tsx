@@ -27,11 +27,9 @@ type MarketState = {
   snapshotStatus: RequestStatus;
 };
 
-type AllMidsMessage = {
-  channel: "allMids";
-  data: {
-    mids: Record<string, string>;
-  };
+type HyperliquidWsMessage = {
+  channel?: string;
+  data?: unknown;
 };
 
 const TRADE_URL = "https://app.hyperliquid.xyz/join/NEUTIZE";
@@ -39,6 +37,7 @@ const PRICE_FALLBACK_INTERVAL_MS = 12_000;
 const RECONNECT_DELAY_MS = 2_500;
 const CHART_SCROLL_DELAY_MS = 90;
 const CHART_SCROLL_DURATION_MS = 920;
+const PRICE_COUNTER_DURATION_MS = 620;
 const SNAPSHOT_REFRESH_INTERVAL_MS = 60_000;
 
 const getInitialMarket = (): MarketState => ({
@@ -52,9 +51,12 @@ const getInitialMarket = (): MarketState => ({
 export default function App() {
   const [market, setMarket] = useState<MarketState>(getInitialMarket);
   const [isChartOpen, setIsChartOpen] = useState(false);
+  const [displayPrice, setDisplayPrice] = useState<number | undefined>();
   const [priceMotion, setPriceMotion] = useState<{ direction?: PriceDirection; pulse: number }>({ pulse: 0 });
   const cursorCloudRef = useRef<HTMLDivElement | null>(null);
+  const displayPriceRef = useRef<number | undefined>(undefined);
   const pendingChartScrollRef = useRef<(() => void) | undefined>(undefined);
+  const priceAnimationFrameRef = useRef<number | undefined>(undefined);
   const previousPriceRef = useRef<number | undefined>(undefined);
   const scrollCleanupRef = useRef<(() => void) | undefined>(undefined);
 
@@ -166,18 +168,14 @@ export default function App() {
 
       socket.addEventListener("open", () => {
         socket?.send(JSON.stringify({ method: "subscribe", subscription: { type: "allMids" } }));
+        socket?.send(JSON.stringify({ method: "subscribe", subscription: { type: "trades", coin: HYPE_SPOT_COIN } }));
       });
 
       socket.addEventListener("message", (event) => {
         const message = safeParseMessage(event.data);
+        const price = message ? readHypePrice(message) : undefined;
 
-        if (message?.channel !== "allMids") {
-          return;
-        }
-
-        const price = Number(message.data.mids[HYPE_SPOT_COIN]);
-
-        if (Number.isFinite(price)) {
+        if (price !== undefined) {
           applyPrice(price);
         }
       });
@@ -231,6 +229,9 @@ export default function App() {
   useEffect(
     () => () => {
       pendingChartScrollRef.current?.();
+      if (priceAnimationFrameRef.current) {
+        window.cancelAnimationFrame(priceAnimationFrameRef.current);
+      }
       scrollCleanupRef.current?.();
     },
     [],
@@ -253,6 +254,43 @@ export default function App() {
     }
 
     previousPriceRef.current = price;
+
+    const startingPrice = displayPriceRef.current;
+
+    if (startingPrice === undefined) {
+      displayPriceRef.current = price;
+      setDisplayPrice(price);
+      return;
+    }
+
+    if (Math.abs(price - startingPrice) <= 0.0000001) {
+      return;
+    }
+
+    if (priceAnimationFrameRef.current) {
+      window.cancelAnimationFrame(priceAnimationFrameRef.current);
+    }
+
+    const animationStart = window.performance.now();
+    const priceDelta = price - startingPrice;
+
+    const stepPrice = (timestamp: number) => {
+      const progress = Math.min((timestamp - animationStart) / PRICE_COUNTER_DURATION_MS, 1);
+      const easedProgress = 1 - Math.pow(1 - progress, 3);
+      const nextPrice = startingPrice + priceDelta * easedProgress;
+
+      displayPriceRef.current = progress >= 1 ? price : nextPrice;
+      setDisplayPrice(displayPriceRef.current);
+
+      if (progress < 1) {
+        priceAnimationFrameRef.current = window.requestAnimationFrame(stepPrice);
+        return;
+      }
+
+      priceAnimationFrameRef.current = undefined;
+    };
+
+    priceAnimationFrameRef.current = window.requestAnimationFrame(stepPrice);
   }, [market.price]);
 
   useEffect(() => {
@@ -265,13 +303,18 @@ export default function App() {
     }
 
     let frameId: number | undefined;
+    let currentX = 0;
+    let currentY = 0;
+    let hasPosition = false;
     let isVisible = false;
-    let nextX = 0;
-    let nextY = 0;
+    let targetX = 0;
+    let targetY = 0;
 
-    const paintCloud = () => {
-      cloud.style.transform = `translate3d(${nextX}px, ${nextY}px, 0)`;
-      frameId = undefined;
+    const followPointer = () => {
+      currentX += (targetX - currentX) * 0.115;
+      currentY += (targetY - currentY) * 0.115;
+      cloud.style.transform = `translate3d(${currentX}px, ${currentY}px, 0)`;
+      frameId = window.requestAnimationFrame(followPointer);
     };
 
     const handlePointerMove = (event: PointerEvent) => {
@@ -279,16 +322,20 @@ export default function App() {
         return;
       }
 
-      nextX = event.clientX;
-      nextY = event.clientY;
+      targetX = event.clientX;
+      targetY = event.clientY;
+
+      if (!hasPosition) {
+        hasPosition = true;
+        currentX = targetX;
+        currentY = targetY;
+        cloud.style.transform = `translate3d(${currentX}px, ${currentY}px, 0)`;
+      }
 
       if (!isVisible) {
         isVisible = true;
         cloud.dataset.visible = "true";
-      }
-
-      if (!frameId) {
-        frameId = window.requestAnimationFrame(paintCloud);
+        frameId = window.requestAnimationFrame(followPointer);
       }
     };
 
@@ -304,7 +351,7 @@ export default function App() {
 
   const answer = market.ath?.hitNewAthToday;
   const isAnswerLoading = answer === undefined && market.snapshotStatus === "loading";
-  const isPriceLoading = market.price === undefined && market.priceStatus === "loading";
+  const isPriceLoading = displayPrice === undefined && market.priceStatus === "loading";
   const answerText = answer === undefined ? "..." : answer ? "Yes." : "No";
   const answerClass = [
     "answer",
@@ -313,8 +360,8 @@ export default function App() {
   ]
     .filter(Boolean)
     .join(" ");
-  const priceClass = ["price", market.price === undefined ? "price-pending" : ""].filter(Boolean).join(" ");
-  const priceText = useMemo(() => formatUsd(market.price), [market.price]);
+  const priceClass = ["price", displayPrice === undefined ? "price-pending" : ""].filter(Boolean).join(" ");
+  const priceText = useMemo(() => formatUsd(displayPrice), [displayPrice]);
   const priceValueClass = [
     "price-value",
     priceMotion.direction === "up" ? "tick-up" : priceMotion.direction === "down" ? "tick-down" : "",
@@ -350,7 +397,7 @@ export default function App() {
   }, [isChartOpen]);
 
   return (
-    <main className="page-shell">
+    <main className={isChartOpen ? "page-shell has-chart" : "page-shell"}>
       <div className="cursor-cloud" ref={cursorCloudRef} aria-hidden="true" />
       <div className="logo-field" aria-hidden="true">
         <div className="logo-mark logo-mark-a" />
@@ -477,16 +524,50 @@ function foldPriceIntoState(state: MarketState, price: number, isRealtime: boole
   };
 }
 
-function safeParseMessage(data: string | ArrayBufferLike | Blob | ArrayBufferView): AllMidsMessage | null {
+function safeParseMessage(data: string | ArrayBufferLike | Blob | ArrayBufferView): HyperliquidWsMessage | null {
   if (typeof data !== "string") {
     return null;
   }
 
   try {
-    return JSON.parse(data) as AllMidsMessage;
+    const parsed = JSON.parse(data);
+
+    return isRecord(parsed) ? parsed : null;
   } catch {
     return null;
   }
+}
+
+function readHypePrice(message: HyperliquidWsMessage): number | undefined {
+  if (message.channel === "allMids" && isRecord(message.data) && isRecord(message.data.mids)) {
+    return toFinitePrice(message.data.mids[HYPE_SPOT_COIN]);
+  }
+
+  if (message.channel === "trades" && Array.isArray(message.data)) {
+    for (let index = message.data.length - 1; index >= 0; index -= 1) {
+      const trade = message.data[index];
+
+      if (isRecord(trade)) {
+        const price = toFinitePrice(trade.px);
+
+        if (price !== undefined) {
+          return price;
+        }
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function toFinitePrice(value: unknown): number | undefined {
+  const price = Number(value);
+
+  return Number.isFinite(price) ? price : undefined;
 }
 
 function getMarketStatus(market: MarketState): string {

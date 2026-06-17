@@ -62,13 +62,17 @@ a {
   align-items: start;
   justify-items: center;
   overflow-x: hidden;
-  overflow-y: auto;
+  overflow-y: hidden;
   padding: var(--page-padding-block) var(--page-padding-inline);
   background:
     linear-gradient(90deg, rgba(0, 213, 193, 0.08) 1px, transparent 1px),
     linear-gradient(180deg, rgba(0, 213, 193, 0.06) 1px, transparent 1px),
     var(--surface);
   background-size: clamp(48px, 9vw, 116px) clamp(48px, 9vw, 116px);
+}
+
+.page-shell.has-chart {
+  overflow-y: auto;
 }
 
 .content-stack {
@@ -79,7 +83,7 @@ a {
   min-height: calc(100dvh - var(--page-padding-block) - var(--page-padding-block));
   align-content: center;
   justify-items: center;
-  gap: clamp(28px, 3.6vw, 42px);
+  gap: clamp(32px, 4.8vh, 52px);
   text-align: center;
 }
 
@@ -90,6 +94,11 @@ a {
   width: min(100%, 1120px);
   justify-items: center;
   padding-bottom: var(--page-padding-block);
+}
+
+.chart-region:empty {
+  display: none;
+  padding-bottom: 0;
 }
 
 h1,
@@ -160,6 +169,7 @@ h1 {
   color: var(--ink);
   font-variant-numeric: tabular-nums;
   font-weight: 820;
+  will-change: contents, color, transform;
 }
 
 .price-direction {
@@ -198,48 +208,55 @@ h1 {
 .price-stack {
   display: grid;
   justify-items: center;
-  gap: 11px;
+  gap: 14px;
 }
 
 .actions-stack {
   display: grid;
   justify-items: center;
-  gap: 18px;
+  gap: 21px;
 }
 
 .trade-button {
   display: inline-flex;
-  min-width: 154px;
-  min-height: 58px;
+  min-width: 150px;
+  min-height: 56px;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 9px;
   border: 1px solid rgba(0, 36, 30, 0.08);
   border-radius: 999px;
   background: var(--accent);
-  box-shadow: 0 20px 58px rgba(0, 213, 193, 0.32);
+  box-shadow:
+    0 12px 34px rgba(0, 213, 193, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.42);
   color: var(--ink);
-  font-size: 1.25rem;
-  font-weight: 820;
+  font-size: 1.08rem;
+  font-weight: 640;
   line-height: 1;
-  padding: 18px 34px 19px;
+  padding: 17px 34px 18px;
   text-decoration: none;
   transition:
-    transform 180ms ease,
-    box-shadow 180ms ease;
+    background 240ms ease,
+    transform 240ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 240ms ease;
   white-space: nowrap;
 }
 
 .trade-arrow {
   display: inline-block;
   font-size: 1.12em;
+  font-weight: 620;
   line-height: 1;
-  transition: transform 180ms ease;
+  transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .trade-button:hover {
-  box-shadow: 0 24px 70px rgba(0, 213, 193, 0.42);
-  transform: translateY(-2px);
+  background: #10e3cf;
+  box-shadow:
+    0 18px 48px rgba(0, 213, 193, 0.52),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  transform: translateY(-2px) scale(1.03);
 }
 
 .trade-button:hover .trade-arrow {
@@ -866,6 +883,7 @@ h1 {
   .trade-button {
     min-width: 138px;
     min-height: 54px;
+    font-size: 1rem;
     padding: 16px 30px 17px;
   }
 
@@ -912,7 +930,7 @@ h1 {
 
 @media (min-width: 1500px) and (min-height: 900px) {
   .content-stack {
-    gap: 32px;
+    gap: 42px;
   }
 
   h1 {
