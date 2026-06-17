@@ -3,6 +3,16 @@ export const HYPERLIQUID_INFO_URL = "https://api.hyperliquid.xyz/info";
 export const HYPERLIQUID_WS_URL = "wss://api.hyperliquid.xyz/ws";
 
 type MidsResponse = Record<string, string>;
+type SpotAssetContext = {
+  circulatingSupply?: string;
+  coin?: string;
+  dayNtlVlm?: string;
+  markPx?: string;
+  midPx?: string | null;
+  prevDayPx?: string;
+  totalSupply?: string;
+};
+type SpotMetaAndAssetCtxsResponse = [unknown, SpotAssetContext[]];
 const INFO_TIMEOUT_MS = 10_000;
 const DAY_MS = 1000 * 60 * 60 * 24;
 const CHART_LOOKBACK_MS_BY_INTERVAL: Record<ChartInterval, number> = {
@@ -42,6 +52,14 @@ export type ChartCandle = {
 };
 
 export type ChartInterval = "1m" | "15m" | "4h";
+
+export type SpotStats = {
+  change24h?: number;
+  circulatingSupply?: number;
+  marketCap?: number;
+  markPrice?: number;
+  volume24h?: number;
+};
 
 async function postInfo<TResponse>(body: unknown): Promise<TResponse> {
   await applyDevDelay();
@@ -92,6 +110,37 @@ export async function fetchCurrentSpotPrice(): Promise<number> {
   }
 
   return price;
+}
+
+export async function fetchSpotStats(): Promise<SpotStats> {
+  const [, contexts] = await postInfo<SpotMetaAndAssetCtxsResponse>({ type: "spotMetaAndAssetCtxs" });
+
+  if (!Array.isArray(contexts)) {
+    throw new Error("HYPE spot stats are unavailable");
+  }
+
+  const hypeContext = contexts.find((context) => context.coin === HYPE_SPOT_COIN);
+
+  if (!hypeContext) {
+    throw new Error("HYPE spot context is unavailable");
+  }
+
+  const markPrice = parseFiniteNumber(hypeContext.midPx ?? hypeContext.markPx);
+  const previousDayPrice = parseFiniteNumber(hypeContext.prevDayPx);
+  const circulatingSupply = parseFiniteNumber(hypeContext.circulatingSupply);
+  const volume24h = parseFiniteNumber(hypeContext.dayNtlVlm);
+
+  return {
+    change24h:
+      markPrice !== undefined && previousDayPrice !== undefined && previousDayPrice > 0
+        ? (markPrice - previousDayPrice) / previousDayPrice
+        : undefined,
+    circulatingSupply,
+    marketCap:
+      markPrice !== undefined && circulatingSupply !== undefined ? markPrice * circulatingSupply : undefined,
+    markPrice,
+    volume24h,
+  };
 }
 
 export async function fetchAthSnapshot(now = Date.now()): Promise<AthSnapshot> {
@@ -160,14 +209,20 @@ export function formatUsd(value: number | undefined): string {
   }
 
   const safeValue = Number(value);
-  const maximumFractionDigits = safeValue >= 100 ? 2 : safeValue >= 1 ? 4 : 6;
+  const fractionDigits = safeValue >= 1 ? 3 : 6;
 
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits,
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
   }).format(safeValue);
+}
+
+function parseFiniteNumber(value: string | null | undefined): number | undefined {
+  const numberValue = Number(value);
+
+  return Number.isFinite(numberValue) ? numberValue : undefined;
 }
 
 function maxHigh(candles: Candle[]): number {

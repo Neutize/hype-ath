@@ -3,9 +3,11 @@ import {
   type AthSnapshot,
   fetchAthSnapshot,
   fetchCurrentSpotPrice,
+  fetchSpotStats,
   formatUsd,
   HYPE_SPOT_COIN,
   HYPERLIQUID_WS_URL,
+  type SpotStats,
 } from "./hyperliquid";
 import { HypeChart } from "./HypeChart";
 
@@ -25,6 +27,9 @@ type MarketState = {
   priceStatus: RequestStatus;
   snapshotError?: string;
   snapshotStatus: RequestStatus;
+  stats?: SpotStats;
+  statsError?: string;
+  statsStatus: RequestStatus;
 };
 
 type HyperliquidWsMessage = {
@@ -46,6 +51,7 @@ const getInitialMarket = (): MarketState => ({
   liveStatus: "connecting",
   priceStatus: "loading",
   snapshotStatus: "loading",
+  statsStatus: "loading",
 });
 
 export default function App() {
@@ -67,12 +73,14 @@ export default function App() {
         isRefreshing: true,
         priceStatus: current.price ? current.priceStatus : "loading",
         snapshotStatus: current.ath ? current.snapshotStatus : "loading",
+        statsStatus: current.stats ? current.statsStatus : "loading",
       }));
     }
 
-    const [athResult, priceResult] = await Promise.allSettled([
+    const [athResult, priceResult, statsResult] = await Promise.allSettled([
       fetchAthSnapshot(),
       fetchCurrentSpotPrice(),
+      fetchSpotStats(),
     ]);
     const refreshedAt = Date.now();
 
@@ -91,6 +99,15 @@ export default function App() {
       } else {
         next.snapshotError = "ATH history is temporarily unavailable.";
         next.snapshotStatus = current.ath ? "stale" : "error";
+      }
+
+      if (statsResult.status === "fulfilled") {
+        next.stats = statsResult.value;
+        next.statsError = undefined;
+        next.statsStatus = "ready";
+      } else {
+        next.statsError = "HYPE market stats are temporarily unavailable.";
+        next.statsStatus = current.stats ? "stale" : "error";
       }
 
       if (priceResult.status === "fulfilled") {
@@ -126,6 +143,7 @@ export default function App() {
         liveStatus: "reconnecting",
         priceStatus: current.price ? "stale" : "error",
         snapshotStatus: current.ath ? "stale" : "error",
+        statsStatus: current.stats ? "stale" : "error",
       }));
     };
 
@@ -372,6 +390,13 @@ export default function App() {
   const answerNotice = market.snapshotStatus === "error" ? notice : undefined;
   const secondaryNotice = answerNotice ? undefined : notice;
   const isBusy = isAnswerLoading || isPriceLoading || market.isRefreshing;
+  const marketCap = useMemo(() => {
+    if (market.stats?.circulatingSupply !== undefined && displayPrice !== undefined) {
+      return market.stats.circulatingSupply * displayPrice;
+    }
+
+    return market.stats?.marketCap;
+  }, [displayPrice, market.stats]);
   const statusText = getMarketStatus(market);
   const toggleChart = useCallback(() => {
     pendingChartScrollRef.current?.();
@@ -403,9 +428,27 @@ export default function App() {
         <div className="logo-mark logo-mark-a" />
         <div className="logo-mark logo-mark-b" />
         <div className="logo-mark logo-mark-c" />
-        <div className="price-line price-line-a" />
-        <div className="price-line price-line-b" />
       </div>
+
+      <header className="topbar" aria-label="HYPE market summary">
+        <div className="topbar-brand" aria-label="HYPE">
+          <span className="topbar-mark" aria-hidden="true" />
+          <span>$HYPE</span>
+        </div>
+        <div className="topbar-stats">
+          <MarketStat
+            label="ATH"
+            value={market.ath ? formatUsd(market.ath.allTimeHigh) : undefined}
+            title={market.ath ? `Set ${formatAthDate(market.ath.allTimeHighDay)}` : undefined}
+          />
+          <MarketStat label="MCap" value={formatCompactUsd(marketCap)} />
+          <MarketStat label="24h Vol" value={formatCompactUsd(market.stats?.volume24h)} />
+        </div>
+        <div className="live-pill" data-live={market.liveStatus === "connected"}>
+          <span className="live-dot" aria-hidden="true" />
+          <span>{market.liveStatus === "connected" ? "Live" : "Syncing"}</span>
+        </div>
+      </header>
 
       <section className="content-stack" aria-busy={isBusy} aria-live="polite">
         <h1>
@@ -442,17 +485,6 @@ export default function App() {
               </>
             )}
           </p>
-          {market.ath ? (
-            <p
-              className="ath-meta"
-              aria-label={`All-time high ${formatUsd(market.ath.allTimeHigh)} set ${formatAthDate(market.ath.allTimeHighDay)}`}
-            >
-              <span>All-time high</span>
-              <strong>{formatUsd(market.ath.allTimeHigh)}</strong>
-              <span className="ath-meta-dot" aria-hidden="true" />
-              <span>set {formatAthDate(market.ath.allTimeHighDay)}</span>
-            </p>
-          ) : null}
         </div>
         <div className="actions-stack">
           <a className="trade-button" href={TRADE_URL} target="_blank" rel="noreferrer">
@@ -494,6 +526,28 @@ export default function App() {
       <p className="visually-hidden">{statusText}</p>
     </main>
   );
+}
+
+function MarketStat({ label, title, value }: { label: string; title?: string; value?: string }) {
+  return (
+    <div className="topbar-stat" title={title}>
+      <span>{label}</span>
+      {value ? <strong>{value}</strong> : <span className="topbar-stat-empty">--</span>}
+    </div>
+  );
+}
+
+function formatCompactUsd(value: number | undefined): string | undefined {
+  if (!Number.isFinite(value)) {
+    return undefined;
+  }
+
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: Number(value) >= 1_000_000_000 ? 2 : 1,
+    notation: "compact",
+  }).format(Number(value));
 }
 
 function foldPriceIntoState(state: MarketState, price: number, isRealtime: boolean, now = Date.now()): MarketState {
