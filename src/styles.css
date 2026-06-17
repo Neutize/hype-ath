@@ -91,6 +91,7 @@ a {
   z-index: 2;
   display: grid;
   width: min(100%, 1120px);
+  min-width: 0;
   min-height: var(--topbar-height);
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
@@ -177,15 +178,32 @@ a {
 }
 
 .live-dot {
+  position: relative;
   width: 8px;
   height: 8px;
+  flex: none;
   border-radius: 50%;
   background: rgba(0, 36, 30, 0.3);
+}
+
+.live-dot::after {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border-radius: inherit;
+  background: rgba(0, 213, 193, 0.22);
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.55);
 }
 
 .live-pill[data-live="true"] .live-dot {
   background: var(--accent);
   box-shadow: 0 0 0 6px rgba(0, 213, 193, 0.14);
+}
+
+.live-pill[data-live="true"] .live-dot::after {
+  opacity: 0.62;
 }
 
 .content-stack {
@@ -865,6 +883,10 @@ h1 {
     animation: float-c 11800ms ease-in-out infinite;
   }
 
+  .live-pill[data-live="true"] .live-dot::after {
+    animation: live-dot-pulse 1600ms ease-out infinite;
+  }
+
 }
 
 @keyframes stack-enter {
@@ -894,6 +916,18 @@ h1 {
   }
   100% {
     background-position: -70% 0;
+  }
+}
+
+@keyframes live-dot-pulse {
+  0% {
+    opacity: 0.62;
+    transform: scale(0.55);
+  }
+  72%,
+  100% {
+    opacity: 0;
+    transform: scale(2.15);
   }
 }
 
@@ -1051,6 +1085,55 @@ h1 {
   }
 }
 
+@media (max-width: 480px) {
+  .page-shell {
+    --page-padding-inline: 14px;
+    --topbar-height: 76px;
+    --topbar-gap: 18px;
+  }
+
+  .topbar {
+    grid-template-areas:
+      "brand live"
+      "stats stats";
+    grid-template-columns: minmax(0, auto) auto;
+    min-height: var(--topbar-height);
+    row-gap: 9px;
+    column-gap: 12px;
+    border-radius: 26px;
+    padding: 10px 12px;
+  }
+
+  .topbar-brand {
+    grid-area: brand;
+    justify-self: start;
+  }
+
+  .topbar-stats {
+    grid-area: stats;
+    width: 100%;
+    justify-content: center;
+    gap: 12px;
+  }
+
+  .topbar-stat {
+    font-size: 0.6rem;
+  }
+
+  .live-pill {
+    grid-area: live;
+    justify-self: end;
+  }
+
+  h1 {
+    font-size: 1.45rem;
+  }
+
+  .price {
+    font-size: 1.42rem;
+  }
+}
+
 @media (min-width: 1500px) and (min-height: 900px) {
   .content-stack {
     gap: 48px;
@@ -1108,14 +1191,6 @@ h1 {
 }
 
 @media (max-width: 420px) {
-  h1 {
-    font-size: 1.45rem;
-  }
-
-  .price {
-    font-size: 1.42rem;
-  }
-
   .ath-meta {
     font-size: 0.78rem;
   }
