@@ -36,6 +36,8 @@ type AllMidsMessage = {
 const TRADE_URL = "https://app.hyperliquid.xyz/join/NEUTIZE";
 const PRICE_FALLBACK_INTERVAL_MS = 12_000;
 const RECONNECT_DELAY_MS = 2_500;
+const CHART_SCROLL_DELAY_MS = 90;
+const CHART_SCROLL_DURATION_MS = 920;
 const SNAPSHOT_REFRESH_INTERVAL_MS = 60_000;
 
 const getInitialMarket = (): MarketState => ({
@@ -225,18 +227,51 @@ export default function App() {
       return;
     }
 
+    let animationId: number | undefined;
     const scrollId = window.setTimeout(() => {
       const chartPanel = document.getElementById("hype-chart-panel");
       const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-      chartPanel?.scrollIntoView({
-        behavior: prefersReducedMotion ? "auto" : "smooth",
-        block: "center",
-        inline: "nearest",
-      });
-    }, 80);
+      if (!chartPanel) {
+        return;
+      }
 
-    return () => window.clearTimeout(scrollId);
+      const startScroll = window.scrollY;
+      const targetScroll = getChartScrollTarget(chartPanel);
+
+      if (prefersReducedMotion) {
+        window.scrollTo(0, targetScroll);
+        return;
+      }
+
+      const distance = targetScroll - startScroll;
+
+      if (Math.abs(distance) < 1) {
+        return;
+      }
+
+      const startTime = window.performance.now();
+
+      const animateScroll = (now: number) => {
+        const progress = Math.min((now - startTime) / CHART_SCROLL_DURATION_MS, 1);
+        const nextScroll = startScroll + distance * easeInOutCubic(progress);
+
+        window.scrollTo(0, nextScroll);
+
+        if (progress < 1) {
+          animationId = window.requestAnimationFrame(animateScroll);
+        }
+      };
+
+      animationId = window.requestAnimationFrame(animateScroll);
+    }, CHART_SCROLL_DELAY_MS);
+
+    return () => {
+      window.clearTimeout(scrollId);
+      if (animationId) {
+        window.cancelAnimationFrame(animationId);
+      }
+    };
   }, [isChartOpen]);
 
   const answer = market.ath?.hitNewAthToday;
@@ -405,6 +440,19 @@ function getMarketNotice(market: MarketState): { body: string; title: string } |
 
 function getOnlineStatus(): boolean {
   return typeof navigator === "undefined" ? true : navigator.onLine;
+}
+
+function getChartScrollTarget(chartPanel: HTMLElement): number {
+  const panelRect = chartPanel.getBoundingClientRect();
+  const documentHeight = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
+  const maxScroll = Math.max(0, documentHeight - window.innerHeight);
+  const centeredScroll = window.scrollY + panelRect.top - Math.max(24, (window.innerHeight - panelRect.height) / 2);
+
+  return Math.min(Math.max(centeredScroll, 0), maxScroll);
+}
+
+function easeInOutCubic(progress: number): number {
+  return progress < 0.5 ? 4 * progress ** 3 : 1 - (-2 * progress + 2) ** 3 / 2;
 }
 
 function shouldMockLiveFeed(): boolean {
