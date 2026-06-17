@@ -447,6 +447,11 @@ h1 {
   text-align: left;
 }
 
+.answer-notice {
+  width: min(100%, 620px);
+  margin-block: clamp(4px, 1.2vh, 14px);
+}
+
 .market-notice div {
   display: grid;
   gap: 3px;

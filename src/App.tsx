@@ -246,6 +246,8 @@ export default function App() {
   const priceClass = ["price", market.price === undefined ? "price-pending" : ""].filter(Boolean).join(" ");
   const priceText = useMemo(() => formatUsd(market.price), [market.price]);
   const notice = getMarketNotice(market);
+  const answerNotice = market.snapshotStatus === "error" ? notice : undefined;
+  const secondaryNotice = answerNotice ? undefined : notice;
   const isBusy = isAnswerLoading || isPriceLoading || market.isRefreshing;
   const statusText = getMarketStatus(market);
   const toggleChart = useCallback(() => {
@@ -283,9 +285,21 @@ export default function App() {
 
       <section className="content-stack" aria-busy={isBusy} aria-live="polite">
         <h1>Did $HYPE hit a new ATH today?</h1>
-        <p className={answerClass} aria-label={isAnswerLoading ? "ATH check loading" : answerText}>
-          {isAnswerLoading ? <span className="shimmer answer-shimmer" aria-hidden="true" /> : answerText}
-        </p>
+        {answerNotice ? (
+          <div className="market-notice answer-notice" role="status">
+            <div>
+              <strong>{answerNotice.title}</strong>
+              <span>{answerNotice.body}</span>
+            </div>
+            <button type="button" onClick={() => void refreshMarket(true)} disabled={market.isRefreshing}>
+              {market.isRefreshing ? "Checking" : "Retry"}
+            </button>
+          </div>
+        ) : (
+          <p className={answerClass} aria-label={isAnswerLoading ? "ATH check loading" : answerText}>
+            {isAnswerLoading ? <span className="shimmer answer-shimmer" aria-hidden="true" /> : answerText}
+          </p>
+        )}
         <p className={priceClass}>
           Current price:{" "}
           {isPriceLoading ? <span className="shimmer price-shimmer" aria-hidden="true" /> : priceText}
@@ -307,11 +321,11 @@ export default function App() {
             </svg>
           </button>
         </div>
-        {notice ? (
+        {secondaryNotice ? (
           <div className="market-notice" role="status">
             <div>
-              <strong>{notice.title}</strong>
-              <span>{notice.body}</span>
+              <strong>{secondaryNotice.title}</strong>
+              <span>{secondaryNotice.body}</span>
             </div>
             <button type="button" onClick={() => void refreshMarket(true)} disabled={market.isRefreshing}>
               {market.isRefreshing ? "Checking" : "Retry"}
