@@ -133,9 +133,10 @@ a {
 }
 
 .topbar-stats {
-  display: flex;
+  display: grid;
   min-width: 0;
   align-items: center;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   justify-content: center;
   gap: clamp(10px, 2vw, 26px);
 }
@@ -151,6 +152,18 @@ a {
   font-weight: 520;
   line-height: 1;
   white-space: nowrap;
+}
+
+.topbar-stat:first-child {
+  justify-self: end;
+}
+
+.topbar-stat:nth-child(2) {
+  justify-self: center;
+}
+
+.topbar-stat:nth-child(3) {
+  justify-self: start;
 }
 
 .topbar-stat strong,
@@ -1038,6 +1051,7 @@ h1 {
   }
 
   .topbar-stats {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     gap: 7px;
   }
 
@@ -1109,10 +1123,19 @@ h1 {
   }
 
   .topbar-stats {
+    display: flex;
     grid-area: stats;
+    flex-wrap: wrap;
     width: 100%;
+    align-items: center;
     justify-content: center;
     gap: 10px;
+  }
+
+  .topbar-stat:first-child,
+  .topbar-stat:nth-child(2),
+  .topbar-stat:nth-child(3) {
+    justify-self: auto;
   }
 
   .topbar-stat {
