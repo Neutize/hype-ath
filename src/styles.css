@@ -137,7 +137,7 @@ a {
   min-width: 0;
   align-items: center;
   justify-content: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: clamp(10px, 2vw, 26px);
 }
 
@@ -997,8 +997,8 @@ h1 {
     --page-padding-top: 12px;
     --page-padding-bottom: 28px;
     --page-padding-inline: 18px;
-    --topbar-height: 76px;
-    --topbar-gap: 20px;
+    --topbar-height: 46px;
+    --topbar-gap: 22px;
   }
 
   h1 {
@@ -1033,20 +1033,14 @@ h1 {
   }
 
   .topbar {
-    grid-template-areas:
-      "brand live"
-      "stats stats";
-    grid-template-columns: minmax(0, auto) auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     min-height: var(--topbar-height);
-    row-gap: 9px;
-    column-gap: 12px;
-    border-radius: 26px;
-    padding: 10px 12px;
+    column-gap: clamp(8px, 1.8vw, 12px);
+    border-radius: 999px;
+    padding: 7px 8px 7px 12px;
   }
 
   .topbar-brand {
-    grid-area: brand;
-    justify-self: start;
     gap: 7px;
     font-size: 0.92rem;
   }
@@ -1056,15 +1050,15 @@ h1 {
   }
 
   .topbar-stats {
-    grid-area: stats;
     width: 100%;
     justify-content: center;
-    gap: 7px 14px;
+    flex-wrap: nowrap;
+    gap: clamp(7px, 1.8vw, 12px);
   }
 
   .topbar-stat {
     gap: 4px;
-    font-size: 0.62rem;
+    font-size: clamp(0.56rem, 1.55vw, 0.62rem);
   }
 
   .topbar-stat-main {
@@ -1076,8 +1070,6 @@ h1 {
   }
 
   .live-pill {
-    grid-area: live;
-    justify-self: end;
     gap: 6px;
     font-size: 0.64rem;
     padding: 8px 10px;
@@ -1115,24 +1107,46 @@ h1 {
   }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 560px) {
   .page-shell {
     --page-padding-inline: 14px;
-    --topbar-height: 88px;
+    --topbar-height: 68px;
     --topbar-gap: 18px;
   }
 
   .topbar {
-    row-gap: 9px;
-    padding: 10px 12px;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
+    column-gap: 8px;
+    row-gap: 2px;
+    border-radius: 26px;
+    padding: 8px 10px;
+  }
+
+  .topbar-brand {
+    grid-column: 1;
+    grid-row: 1;
+    align-self: center;
+    font-size: 0.86rem;
+  }
+
+  .topbar-mark {
+    width: 20px;
   }
 
   .topbar-stats {
-    gap: 7px 12px;
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: stretch;
+    align-content: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 5px 10px;
+    width: 100%;
   }
 
   .topbar-stat {
-    font-size: 0.6rem;
+    font-size: clamp(0.5rem, 2.3vw, 0.56rem);
   }
 
   .topbar-stat:first-child {
@@ -1141,7 +1155,22 @@ h1 {
   }
 
   .topbar-stat-detail {
-    gap: 4px;
+    gap: 3px;
+  }
+
+  .topbar-stat-detail::before {
+    width: 2.5px;
+    height: 2.5px;
+  }
+
+  .live-pill {
+    grid-column: 3;
+    grid-row: 1;
+    align-self: center;
+    justify-self: end;
+    gap: 5px;
+    font-size: 0.58rem;
+    padding: 7px 8px;
   }
 
   h1 {
@@ -1150,6 +1179,31 @@ h1 {
 
   .price {
     font-size: 1.42rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .topbar {
+    column-gap: 6px;
+    padding-inline: 8px;
+  }
+
+  .topbar-brand {
+    gap: 5px;
+    font-size: 0.78rem;
+  }
+
+  .topbar-mark {
+    width: 18px;
+  }
+
+  .topbar-stats {
+    gap: 5px 8px;
+  }
+
+  .live-pill {
+    font-size: 0.54rem;
+    padding-inline: 7px;
   }
 }
 
