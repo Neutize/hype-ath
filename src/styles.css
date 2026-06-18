@@ -159,6 +159,23 @@ a {
   font-weight: 640;
 }
 
+.topbar-stat-detail {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(0, 36, 30, 0.42);
+  font-weight: 520;
+}
+
+.topbar-stat-detail::before {
+  content: "";
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.52;
+}
+
 .topbar-stat-empty {
   color: rgba(0, 36, 30, 0.34);
 }
@@ -1021,7 +1038,7 @@ h1 {
   }
 
   .topbar-stats {
-    gap: 9px;
+    gap: 7px;
   }
 
   .topbar-stat {
@@ -1095,11 +1112,15 @@ h1 {
     grid-area: stats;
     width: 100%;
     justify-content: center;
-    gap: 12px;
+    gap: 10px;
   }
 
   .topbar-stat {
     font-size: 0.6rem;
+  }
+
+  .topbar-stat-detail {
+    gap: 4px;
   }
 
   .live-pill {

@@ -452,6 +452,7 @@ export default function App() {
           <MarketStat
             label="ATH"
             value={market.ath ? formatUsd(market.ath.allTimeHigh) : undefined}
+            detail={market.ath ? `set ${formatAthDate(market.ath.allTimeHighDay)}` : undefined}
             title={market.ath ? `Set ${formatAthDate(market.ath.allTimeHighDay)}` : undefined}
           />
           <MarketStat label="MCap" value={formatCompactUsd(marketCap, 2)} />
@@ -541,11 +542,12 @@ export default function App() {
   );
 }
 
-function MarketStat({ label, title, value }: { label: string; title?: string; value?: string }) {
+function MarketStat({ detail, label, title, value }: { detail?: string; label: string; title?: string; value?: string }) {
   return (
     <div className="topbar-stat" title={title}>
       <span>{label}</span>
       {value ? <strong>{value}</strong> : <span className="topbar-stat-empty">--</span>}
+      {detail ? <span className="topbar-stat-detail">{detail}</span> : null}
     </div>
   );
 }
