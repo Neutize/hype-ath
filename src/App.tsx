@@ -11,6 +11,7 @@ import {
 } from "./hyperliquid";
 import { HypeChart } from "./HypeChart";
 import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 
 type RequestStatus = "loading" | "ready" | "stale" | "error";
 type PriceDirection = "up" | "down";
@@ -540,6 +541,7 @@ export default function App() {
 
       <p className="visually-hidden">{statusText}</p>
       <Analytics />
+      <SpeedInsights />
     </main>
   );
 }
