@@ -10,6 +10,7 @@ import {
   type SpotStats,
 } from "./hyperliquid";
 import { HypeChart } from "./HypeChart";
+import { Analytics } from "@vercel/analytics/react";
 
 type RequestStatus = "loading" | "ready" | "stale" | "error";
 type PriceDirection = "up" | "down";
@@ -538,6 +539,7 @@ export default function App() {
       </div>
 
       <p className="visually-hidden">{statusText}</p>
+      <Analytics />
     </main>
   );
 }
