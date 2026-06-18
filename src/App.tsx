@@ -454,7 +454,7 @@ export default function App() {
             value={market.ath ? formatUsd(market.ath.allTimeHigh) : undefined}
             title={market.ath ? `Set ${formatAthDate(market.ath.allTimeHighDay)}` : undefined}
           />
-          <MarketStat label="MCap" value={formatCompactUsd(marketCap)} />
+          <MarketStat label="MCap" value={formatCompactUsd(marketCap, 2)} />
           <MarketStat label="24h Vol" value={formatCompactUsd(market.stats?.volume24h)} />
         </div>
         <div className="live-pill" data-live={market.liveStatus === "connected"}>
@@ -550,15 +550,18 @@ function MarketStat({ label, title, value }: { label: string; title?: string; va
   );
 }
 
-function formatCompactUsd(value: number | undefined): string | undefined {
+function formatCompactUsd(value: number | undefined, fractionDigits?: number): string | undefined {
   if (!Number.isFinite(value)) {
     return undefined;
   }
 
+  const compactFractionDigits = fractionDigits ?? (Number(value) >= 1_000_000_000 ? 2 : 1);
+
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-    maximumFractionDigits: Number(value) >= 1_000_000_000 ? 2 : 1,
+    maximumFractionDigits: compactFractionDigits,
+    minimumFractionDigits: fractionDigits,
     notation: "compact",
   }).format(Number(value));
 }
