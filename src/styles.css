@@ -133,18 +133,18 @@ a {
 }
 
 .topbar-stats {
-  display: grid;
+  display: flex;
   min-width: 0;
   align-items: center;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   justify-content: center;
+  flex-wrap: wrap;
   gap: clamp(10px, 2vw, 26px);
 }
 
 .topbar-stat {
   display: inline-flex;
   min-width: 0;
-  align-items: baseline;
+  align-items: center;
   gap: 6px;
   color: rgba(0, 36, 30, 0.52);
   font-family: var(--font-mono);
@@ -154,16 +154,12 @@ a {
   white-space: nowrap;
 }
 
-.topbar-stat:first-child {
-  justify-self: end;
-}
-
-.topbar-stat:nth-child(2) {
-  justify-self: center;
-}
-
-.topbar-stat:nth-child(3) {
-  justify-self: start;
+.topbar-stat-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .topbar-stat strong,
@@ -178,6 +174,7 @@ a {
   gap: 6px;
   color: rgba(0, 36, 30, 0.42);
   font-weight: 520;
+  line-height: 1;
 }
 
 .topbar-stat-detail::before {
@@ -1000,8 +997,8 @@ h1 {
     --page-padding-top: 12px;
     --page-padding-bottom: 28px;
     --page-padding-inline: 18px;
-    --topbar-height: 46px;
-    --topbar-gap: 22px;
+    --topbar-height: 76px;
+    --topbar-gap: 20px;
   }
 
   h1 {
@@ -1036,12 +1033,20 @@ h1 {
   }
 
   .topbar {
-    min-height: 46px;
-    gap: 8px;
-    padding: 7px 8px 7px 12px;
+    grid-template-areas:
+      "brand live"
+      "stats stats";
+    grid-template-columns: minmax(0, auto) auto;
+    min-height: var(--topbar-height);
+    row-gap: 9px;
+    column-gap: 12px;
+    border-radius: 26px;
+    padding: 10px 12px;
   }
 
   .topbar-brand {
+    grid-area: brand;
+    justify-self: start;
     gap: 7px;
     font-size: 0.92rem;
   }
@@ -1051,8 +1056,10 @@ h1 {
   }
 
   .topbar-stats {
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-    gap: 7px;
+    grid-area: stats;
+    width: 100%;
+    justify-content: center;
+    gap: 7px 14px;
   }
 
   .topbar-stat {
@@ -1060,7 +1067,17 @@ h1 {
     font-size: 0.62rem;
   }
 
+  .topbar-stat-main {
+    gap: 4px;
+  }
+
+  .topbar-stat-detail {
+    gap: 5px;
+  }
+
   .live-pill {
+    grid-area: live;
+    justify-self: end;
     gap: 6px;
     font-size: 0.64rem;
     padding: 8px 10px;
@@ -1101,58 +1118,34 @@ h1 {
 @media (max-width: 480px) {
   .page-shell {
     --page-padding-inline: 14px;
-    --topbar-height: 76px;
+    --topbar-height: 88px;
     --topbar-gap: 18px;
   }
 
   .topbar {
-    grid-template-areas:
-      "brand live"
-      "stats stats";
-    grid-template-columns: minmax(0, auto) auto;
-    min-height: var(--topbar-height);
     row-gap: 9px;
-    column-gap: 12px;
-    border-radius: 26px;
     padding: 10px 12px;
   }
 
-  .topbar-brand {
-    grid-area: brand;
-    justify-self: start;
-  }
-
   .topbar-stats {
-    display: flex;
-    grid-area: stats;
-    flex-wrap: wrap;
-    width: 100%;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-  }
-
-  .topbar-stat:first-child,
-  .topbar-stat:nth-child(2),
-  .topbar-stat:nth-child(3) {
-    justify-self: auto;
+    gap: 7px 12px;
   }
 
   .topbar-stat {
     font-size: 0.6rem;
   }
 
+  .topbar-stat:first-child {
+    flex-basis: 100%;
+    justify-content: center;
+  }
+
   .topbar-stat-detail {
     gap: 4px;
   }
 
-  .live-pill {
-    grid-area: live;
-    justify-self: end;
-  }
-
   h1 {
-    font-size: 1.45rem;
+    font-size: clamp(1.05rem, 4.7vw, 1.45rem);
   }
 
   .price {

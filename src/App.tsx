@@ -545,8 +545,10 @@ export default function App() {
 function MarketStat({ detail, label, title, value }: { detail?: string; label: string; title?: string; value?: string }) {
   return (
     <div className="topbar-stat" title={title}>
-      <span>{label}</span>
-      {value ? <strong>{value}</strong> : <span className="topbar-stat-empty">--</span>}
+      <span className="topbar-stat-main">
+        <span>{label}</span>
+        {value ? <strong>{value}</strong> : <span className="topbar-stat-empty">--</span>}
+      </span>
       {detail ? <span className="topbar-stat-detail">{detail}</span> : null}
     </div>
   );
